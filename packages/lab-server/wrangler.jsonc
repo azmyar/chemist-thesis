@@ -1,0 +1,39 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "chemist-lab-server",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-07-22",
+	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		"FRONTEND_ORIGIN": "http://localhost:3000"
+	},
+
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "GAME_ROOM",
+				"class_name": "GameRoom"
+			}
+		]
+	},
+
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_classes": ["GameRoom"]
+		}
+	],
+
+	"env": {
+		"staging": {
+			"vars": {
+				"FRONTEND_ORIGIN": "https://your-staging-frontend.vercel.app"
+			}
+		},
+		"production": {
+			"vars": {
+				"FRONTEND_ORIGIN": "https://your-frontend.vercel.app"
+			}
+		}
+	}
+}

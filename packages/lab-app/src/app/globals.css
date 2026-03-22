@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "../styles/colors.css";
+@import "../styles/fonts.css";
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	background-color: #1e1e1e;
+	min-height: 100vh;
+	margin: 0;
+}
+
+/* Game canvas fills the viewport */
+#game-canvas {
+	width: 100vw;
+	height: 100vh;
+	display: block;
+}
+
+/* Virtual joystick styles */
+.joystick-zone {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	width: 50%;
+	height: 40%;
+	z-index: 10;
+	touch-action: none;
+}
+
+.joystick-base {
+	width: 120px;
+	height: 120px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.15);
+	border: 2px solid rgba(255, 255, 255, 0.3);
+	position: absolute;
+	z-index: 11;
+}
+
+.joystick-thumb {
+	width: 50px;
+	height: 50px;
+	border-radius: 50%;
+	background: rgba(5, 144, 214, 0.6);
+	border: 2px solid rgba(5, 144, 214, 0.8);
+	position: absolute;
+	z-index: 12;
+}

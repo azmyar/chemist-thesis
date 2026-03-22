@@ -1,0 +1,10 @@
+node_modules/
+packages/*/node_modules/
+packages/*/.next/
+packages/*/.wrangler/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.local.example
+!.dev.vars.example

@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+	--font-outfit: var(--font-outfit), "sans-serif";
+	--font-nunito: var(--font-nunito), "sans-serif";
+}
+
+:root {
+	--font-size-2xl: 2.75rem;
+	--font-size-xl: 2rem;
+	--font-size-lg: 1.5rem;
+	--font-size-md: 1.125rem;
+	--font-size-base: 1rem;
+	--font-size-sm: 0.875rem;
+	--font-size-xs: 0.75rem;
+
+	--font-weight-semibold: 600;
+	--font-weight-medium: 500;
+}
+
+@media (max-width: 768px) {
+	:root {
+		--font-size-2xl: 1.75rem;
+		--font-size-xl: 1.5rem;
+		--font-size-lg: 1.25rem;
+		--font-size-md: 1rem;
+		--font-size-base: 1rem;
+		--font-size-sm: 0.75rem;
+		--font-size-xs: 0.75rem;
+	}
+}
+
+@layer components {
+	.title-1 {
+		font-family: var(--font-outfit);
+		font-size: var(--font-size-2xl);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+
+	.title-2 {
+		font-family: var(--font-outfit);
+		font-size: var(--font-size-xl);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+
+	.title-3 {
+		font-family: var(--font-outfit);
+		font-size: var(--font-size-lg);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+
+	.heading-1 {
+		font-family: var(--font-outfit);
+		font-size: var(--font-size-md);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+
+	.heading-2 {
+		font-family: var(--font-outfit);
+		font-size: var(--font-size-base);
+		font-weight: var(--font-weight-medium);
+		line-height: auto;
+	}
+
+	.heading-3 {
+		font-family: var(--font-outfit);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		line-height: auto;
+	}
+
+	.heading-4 {
+		font-family: var(--font-outfit);
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-medium);
+		line-height: auto;
+	}
+
+	.body-1 {
+		font-family: var(--font-nunito);
+		font-size: var(--font-size-md);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+
+	.body-2 {
+		font-family: var(--font-nunito);
+		font-size: var(--font-size-base);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+
+	.body-3 {
+		font-family: var(--font-nunito);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+
+	.body-4 {
+		font-family: var(--font-nunito);
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-semibold);
+		line-height: auto;
+	}
+}
