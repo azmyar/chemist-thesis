@@ -36,9 +36,27 @@ export const clientStopSchema = z.object({
 	direction: directionSchema,
 });
 
+export const rtcSignalSchema = z.discriminatedUnion("type", [
+	z.object({ type: z.literal("offer"), sdp: z.string() }),
+	z.object({ type: z.literal("answer"), sdp: z.string() }),
+	z.object({
+		type: z.literal("ice-candidate"),
+		candidate: z.string(),
+		sdpMid: z.string().nullable(),
+		sdpMLineIndex: z.number().nullable(),
+	}),
+]);
+
+export const clientSignalSchema = z.object({
+	type: z.literal("signal"),
+	targetId: z.string(),
+	signal: rtcSignalSchema,
+});
+
 export const clientMessageSchema = z.discriminatedUnion("type", [
 	clientMoveSchema,
 	clientStopSchema,
+	clientSignalSchema,
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
@@ -68,7 +86,12 @@ export type ServerMessage =
 			y: number;
 			direction: Direction;
 	  }
-	| { type: "error"; message: string };
+	| { type: "error"; message: string }
+	| {
+			type: "signal";
+			fromId: string;
+			signal: z.infer<typeof rtcSignalSchema>;
+	  };
 
 // ── Room Config ───────────────────────────────────
 

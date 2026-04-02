@@ -48,8 +48,9 @@ bun run dev:app
 - Project ini sudah dipisahkan dari monorepo `chemist`.
 - Project berjalan tanpa auth eksternal (guest mode).
 - `NEXT_PUBLIC_API_URL` sudah tidak dipakai lagi di `lab-app`.
-- `NEXT_PUBLIC_WS_URL` default untuk lokal: `ws://localhost:8787`.
-- Port dev `lab-server`: `8787` (Cloudflare Durable Object tetap berjalan normal di port ini).
+- `NEXT_PUBLIC_WS_URL` default untuk lokal: `ws://localhost:8788`.
+- Port dev `lab-app`: `3000`.
+- Port dev `lab-server`: `8788` (Cloudflare Durable Object tetap berjalan normal di port ini).
 - `CORE_API_URL` sudah tidak dibutuhkan lagi di `lab-server`.
 
 ## Deploy Frontend (Vercel)

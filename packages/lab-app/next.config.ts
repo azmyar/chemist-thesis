@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import path from "path";
 
-const LAB_SERVER_URL = process.env.LAB_SERVER_URL ?? "http://localhost:8787";
+const LAB_SERVER_URL = process.env.LAB_SERVER_URL ?? "http://localhost:8788";
 
 const nextConfig: NextConfig = {
 	webpack: (config) => {

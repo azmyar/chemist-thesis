@@ -13,8 +13,17 @@ interface PlayerConnection {
 	state: PlayerState;
 }
 
+interface PlayerSocketAttachment {
+	playerState: PlayerState;
+}
+
 export class GameRoom extends DurableObject {
 	private players: Map<string, PlayerConnection> = new Map();
+
+	constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
+		super(ctx, env);
+		this.rehydratePlayers();
+	}
 
 	async fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
@@ -67,7 +76,7 @@ export class GameRoom extends DurableObject {
 			state: playerState,
 		});
 
-		server.serializeAttachment({ userId: user.id });
+		this.persistPlayerState(server, playerState);
 
 		const snapshot: ServerMessage = {
 			type: "snapshot",
@@ -86,11 +95,11 @@ export class GameRoom extends DurableObject {
 		message: string | ArrayBuffer,
 	): Promise<void> {
 		const attachment = ws.deserializeAttachment() as {
-			userId: string;
+			playerState: PlayerState;
 		} | null;
 		if (!attachment) return;
 
-		const player = this.players.get(attachment.userId);
+		const player = this.players.get(attachment.playerState.id);
 		if (!player) return;
 
 		try {
@@ -99,7 +108,7 @@ export class GameRoom extends DurableObject {
 					? message
 					: new TextDecoder().decode(message);
 			const parsed = clientMessageSchema.parse(JSON.parse(raw));
-			this.handleClientMessage(attachment.userId, player, parsed);
+			this.handleClientMessage(attachment.playerState.id, player, parsed);
 		} catch {
 			ws.send(
 				JSON.stringify({
@@ -116,27 +125,27 @@ export class GameRoom extends DurableObject {
 		_reason: string,
 	): Promise<void> {
 		const attachment = ws.deserializeAttachment() as {
-			userId: string;
+			playerState: PlayerState;
 		} | null;
 		if (!attachment) return;
 
-		this.players.delete(attachment.userId);
+		this.players.delete(attachment.playerState.id);
 		this.broadcast({
 			type: "player_leave",
-			playerId: attachment.userId,
+			playerId: attachment.playerState.id,
 		});
 	}
 
 	async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
 		const attachment = ws.deserializeAttachment() as {
-			userId: string;
+			playerState: PlayerState;
 		} | null;
 		if (!attachment) return;
 
-		this.players.delete(attachment.userId);
+		this.players.delete(attachment.playerState.id);
 		this.broadcast({
 			type: "player_leave",
-			playerId: attachment.userId,
+			playerId: attachment.playerState.id,
 		});
 	}
 
@@ -146,6 +155,23 @@ export class GameRoom extends DurableObject {
 		msg: ClientMessage,
 	): void {
 		switch (msg.type) {
+			case "signal": {
+				const target = this.players.get(msg.targetId);
+				if (target) {
+					try {
+						target.ws.send(
+							JSON.stringify({
+								type: "signal",
+								fromId: playerId,
+								signal: msg.signal,
+							}),
+						);
+					} catch {
+						// Target connection dead
+					}
+				}
+				break;
+			}
 			case "move": {
 				const x = Math.max(0, Math.min(msg.x, ROOM_CONFIG.MAP_WIDTH));
 				const y = Math.max(0, Math.min(msg.y, ROOM_CONFIG.MAP_HEIGHT));
@@ -155,6 +181,7 @@ export class GameRoom extends DurableObject {
 				player.state.direction = msg.direction;
 				player.state.vx = msg.vx;
 				player.state.vy = msg.vy;
+				this.persistPlayerState(player.ws, player.state);
 
 				this.broadcast(
 					{
@@ -179,6 +206,7 @@ export class GameRoom extends DurableObject {
 				player.state.direction = msg.direction;
 				player.state.vx = 0;
 				player.state.vy = 0;
+				this.persistPlayerState(player.ws, player.state);
 
 				this.broadcast(
 					{
@@ -205,5 +233,33 @@ export class GameRoom extends DurableObject {
 				// Connection dead — will be cleaned up on close/error event
 			}
 		}
+	}
+
+	private rehydratePlayers(): void {
+		for (const ws of this.ctx.getWebSockets()) {
+			const attachment =
+				ws.deserializeAttachment() as PlayerSocketAttachment | null;
+			const playerState = attachment?.playerState;
+
+			if (!playerState) {
+				try {
+					ws.close(1011, "Missing player state");
+				} catch {
+					// Socket may already be closed.
+				}
+				continue;
+			}
+
+			this.players.set(playerState.id, {
+				ws,
+				state: playerState,
+			});
+		}
+	}
+
+	private persistPlayerState(ws: WebSocket, playerState: PlayerState): void {
+		ws.serializeAttachment({
+			playerState: { ...playerState },
+		} satisfies PlayerSocketAttachment);
 	}
 }

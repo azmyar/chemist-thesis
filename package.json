@@ -7,9 +7,9 @@
     "packages/shared"
   ],
   "scripts": {
-    "dev": "concurrently -n lab-app,lab-server -c '#ff6b6b,#a855f7' \"bun run --filter=@chemist/lab-app dev\" \"bun run --filter=@chemist/lab-server dev -- --port 8787\"",
+    "dev": "concurrently -n lab-app,lab-server -c '#ff6b6b,#a855f7' \"bun run --filter=@chemist/lab-app dev\" \"bun run --filter=@chemist/lab-server dev\"",
     "dev:app": "bun run --filter=@chemist/lab-app dev",
-    "dev:server": "bun run --filter=@chemist/lab-server dev -- --port 8787",
+    "dev:server": "bun run --filter=@chemist/lab-server dev",
     "build": "bun run --filter=@chemist/lab-app build"
   },
   "devDependencies": {

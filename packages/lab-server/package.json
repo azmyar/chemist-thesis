@@ -4,12 +4,12 @@
 	"private": true,
 	"main": "src/index.ts",
 	"scripts": {
-		"dev": "wrangler dev",
+		"dev": "wrangler dev --port 8788",
 		"deploy:staging": "wrangler deploy --env staging --minify",
 		"deploy:production": "wrangler deploy --env production --minify"
 	},
 	"dependencies": {
-		"@chemist/shared": "workspace:*",
+		"@chemist/shared": "file:../shared",
 		"@cloudflare/workers-types": "^4.20240827.0",
 		"hono": "^4.6.14"
 	},

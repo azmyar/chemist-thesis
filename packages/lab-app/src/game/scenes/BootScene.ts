@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import type { Direction } from "@chemist/shared";
+import type { Direction } from "@/lib/protocol";
 
 interface CharColors {
 	skin: number;

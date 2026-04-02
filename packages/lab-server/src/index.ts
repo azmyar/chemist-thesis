@@ -37,7 +37,7 @@ app.use(
 				if (isOriginAllowed(origin, allowedOrigins)) return origin;
 				if (origin.endsWith(".chemist.id")) return origin;
 				if (origin.startsWith("http://localhost:")) return origin;
-				return allowedOrigins[0] ?? "http://localhost:3000";
+				return allowedOrigins[0] ?? "http://localhost:3001";
 			},
 			allowHeaders: ["Content-Type", "Authorization", "Upgrade"],
 			allowMethods: ["GET", "POST", "OPTIONS"],

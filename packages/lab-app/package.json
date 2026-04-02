@@ -8,7 +8,6 @@
 		"start": "next start"
 	},
 	"dependencies": {
-		"@chemist/shared": "workspace:*",
 		"next": "15.4.8",
 		"phaser": "^3.90.0",
 		"react": "19",

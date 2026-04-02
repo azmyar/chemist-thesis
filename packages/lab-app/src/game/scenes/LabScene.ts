@@ -4,8 +4,8 @@ import type {
 	PlayerState,
 	ServerMessage,
 	Direction,
-} from "@chemist/shared";
-import { ROOM_CONFIG } from "@chemist/shared";
+} from "@/lib/protocol";
+import { ROOM_CONFIG } from "@/lib/protocol";
 import type { UIScene } from "./UIScene";
 
 /** Camera zoom — sprites are 1:1 native, camera magnifies everything like Gather.town */

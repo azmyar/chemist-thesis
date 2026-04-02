@@ -6,7 +6,7 @@ Multiplayer pixel art lab game at `lab.chemist.id`.
 
 ```bash
 cd packages/lab-app
-bun run dev    # Next.js Turbopack dev server on port 3001
+bun run dev    # Next.js Turbopack dev server on port 3000
 bun run build  # Production build
 ```
 
