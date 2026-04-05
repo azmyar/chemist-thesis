@@ -210,49 +210,58 @@ export class BootScene extends Phaser.Scene {
 		tdCtx.fillRect(0, 3, 64, 1);
 		td.refresh();
 
-		// Lab bench — 64×64
-		const lb = this.textures.createCanvas("lab-bench", 64, 64)!;
-		const lbCtx = lb.context;
-		lbCtx.fillStyle = "#495057";
-		lbCtx.fillRect(0, 4, 64, 56);
-		lbCtx.fillStyle = "#5c636a";
-		lbCtx.fillRect(2, 4, 60, 12);
-		lbCtx.fillStyle = "#6c757d";
-		lbCtx.fillRect(4, 6, 56, 8);
-		lbCtx.fillStyle = "#7a838c";
-		lbCtx.fillRect(6, 7, 30, 1);
-		lbCtx.fillRect(6, 10, 20, 1);
-		lbCtx.fillStyle = "#adb5bd";
-		lbCtx.fillRect(24, 22, 16, 14);
-		lbCtx.fillStyle = "#868e96";
-		lbCtx.fillRect(26, 24, 12, 10);
-		lbCtx.fillStyle = "#74c0fc";
-		lbCtx.fillRect(28, 26, 8, 6);
-		lbCtx.fillStyle = "#6c757d";
-		lbCtx.fillRect(31, 20, 2, 4);
-		lbCtx.fillStyle = "#495057";
-		lbCtx.fillRect(31, 29, 2, 2);
-		lbCtx.fillStyle = "#a5d8ff";
-		lbCtx.fillRect(8, 8, 4, 6);
-		lbCtx.fillStyle = "#d0ebff";
-		lbCtx.fillRect(9, 9, 2, 4);
-		lbCtx.fillStyle = "#ffd8a8";
-		lbCtx.fillRect(14, 9, 3, 5);
-		lbCtx.fillStyle = "#ffe8cc";
-		lbCtx.fillRect(15, 10, 1, 3);
-		lbCtx.fillStyle = "#3d4349";
-		lbCtx.fillRect(4, 40, 24, 18);
-		lbCtx.fillRect(36, 40, 24, 18);
-		lbCtx.fillStyle = "#6c757d";
-		lbCtx.fillRect(14, 46, 4, 6);
-		lbCtx.fillRect(46, 46, 4, 6);
-		lbCtx.fillStyle = "#495057";
-		lbCtx.fillRect(15, 40, 2, 18);
-		lbCtx.fillRect(47, 40, 2, 18);
-		lbCtx.fillStyle = "#343a40";
-		lbCtx.fillRect(0, 2, 64, 2);
-		lbCtx.fillRect(0, 60, 64, 4);
-		lb.refresh();
+		// Workbench — 32×32 clean white lab table
+		const bench = this.textures.createCanvas("workbench", 32, 32)!;
+		const benchCtx = bench.context;
+		// Table top surface — clean white
+		benchCtx.fillStyle = "#f8f9fa";
+		benchCtx.fillRect(0, 4, 32, 16);
+		// Top edge highlight
+		benchCtx.fillStyle = "#ffffff";
+		benchCtx.fillRect(1, 4, 30, 2);
+		// Subtle top border
+		benchCtx.fillStyle = "#dee2e6";
+		benchCtx.fillRect(0, 3, 32, 1);
+		// Side edges
+		benchCtx.fillStyle = "#e9ecef";
+		benchCtx.fillRect(0, 6, 1, 14);
+		benchCtx.fillRect(31, 6, 1, 14);
+		// Table legs — light grey
+		benchCtx.fillStyle = "#ced4da";
+		benchCtx.fillRect(2, 20, 3, 12);
+		benchCtx.fillRect(27, 20, 3, 12);
+		// Leg highlights
+		benchCtx.fillStyle = "#e9ecef";
+		benchCtx.fillRect(3, 20, 1, 11);
+		benchCtx.fillRect(28, 20, 1, 11);
+		// Bottom of table surface shadow
+		benchCtx.fillStyle = "#dee2e6";
+		benchCtx.fillRect(0, 19, 32, 1);
+		bench.refresh();
+
+		// Storage cabinet — 32×32 clean white
+		const stor = this.textures.createCanvas("storage", 32, 32)!;
+		const sCtx = stor.context;
+		// Cabinet body
+		sCtx.fillStyle = "#f8f9fa";
+		sCtx.fillRect(2, 2, 28, 28);
+		// Border
+		sCtx.fillStyle = "#dee2e6";
+		sCtx.fillRect(2, 2, 28, 1);
+		sCtx.fillRect(2, 29, 28, 1);
+		sCtx.fillRect(2, 2, 1, 28);
+		sCtx.fillRect(29, 2, 1, 28);
+		// Shelf divider
+		sCtx.fillStyle = "#ced4da";
+		sCtx.fillRect(4, 15, 24, 1);
+		// Door handles
+		sCtx.fillStyle = "#adb5bd";
+		sCtx.fillRect(14, 9, 4, 2);
+		sCtx.fillRect(14, 21, 4, 2);
+		// Top highlight
+		sCtx.fillStyle = "#ffffff";
+		sCtx.fillRect(3, 3, 26, 1);
+		stor.refresh();
 
 		// Fume hood — 64×64
 		const fh = this.textures.createCanvas("fume-hood", 64, 64)!;

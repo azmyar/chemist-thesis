@@ -15,8 +15,28 @@ export const playerStateSchema = z.object({
 	direction: directionSchema,
 	vx: z.number(),
 	vy: z.number(),
+	holding: z.string().nullable(),
 });
 export type PlayerState = z.infer<typeof playerStateSchema>;
+
+// ── Game Object State ─────────────────────────────
+
+export const gameObjectTypeSchema = z.enum(["workbench", "storage"]);
+export type GameObjectType = z.infer<typeof gameObjectTypeSchema>;
+
+export const inventoryItemSchema = z.object({
+	itemId: z.string(),
+	name: z.string(),
+	quantity: z.number().int().min(0),
+});
+export type InventoryItem = z.infer<typeof inventoryItemSchema>;
+
+export const gameObjectStateSchema = z.object({
+	id: z.string(),
+	objectType: gameObjectTypeSchema,
+	items: z.array(inventoryItemSchema),
+});
+export type GameObjectState = z.infer<typeof gameObjectStateSchema>;
 
 // ── Client → Server Messages ──────────────────────
 
@@ -36,27 +56,28 @@ export const clientStopSchema = z.object({
 	direction: directionSchema,
 });
 
-export const rtcSignalSchema = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("offer"), sdp: z.string() }),
-	z.object({ type: z.literal("answer"), sdp: z.string() }),
-	z.object({
-		type: z.literal("ice-candidate"),
-		candidate: z.string(),
-		sdpMid: z.string().nullable(),
-		sdpMLineIndex: z.number().nullable(),
-	}),
-]);
+export const clientChatSchema = z.object({
+	type: z.literal("chat"),
+	text: z.string().min(1).max(200),
+});
 
-export const clientSignalSchema = z.object({
-	type: z.literal("signal"),
-	targetId: z.string(),
-	signal: rtcSignalSchema,
+export const clientTakeItemSchema = z.object({
+	type: z.literal("take_item"),
+	objectId: z.string(),
+	itemId: z.string(),
+});
+
+export const clientPlaceItemSchema = z.object({
+	type: z.literal("place_item"),
+	objectId: z.string(),
 });
 
 export const clientMessageSchema = z.discriminatedUnion("type", [
 	clientMoveSchema,
 	clientStopSchema,
-	clientSignalSchema,
+	clientChatSchema,
+	clientTakeItemSchema,
+	clientPlaceItemSchema,
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
@@ -67,6 +88,7 @@ export type ServerMessage =
 			type: "snapshot";
 			selfId: string;
 			players: PlayerState[];
+			objects: GameObjectState[];
 	  }
 	| { type: "player_join"; player: PlayerState }
 	| { type: "player_leave"; playerId: string }
@@ -87,10 +109,16 @@ export type ServerMessage =
 			direction: Direction;
 	  }
 	| { type: "error"; message: string }
+	| { type: "chat"; playerId: string; playerName: string; text: string }
 	| {
-			type: "signal";
-			fromId: string;
-			signal: z.infer<typeof rtcSignalSchema>;
+			type: "object_items_changed";
+			objectId: string;
+			items: InventoryItem[];
+	  }
+	| {
+			type: "player_hold";
+			playerId: string;
+			item: string | null;
 	  };
 
 // ── Room Config ───────────────────────────────────

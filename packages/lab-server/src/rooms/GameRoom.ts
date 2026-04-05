@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import {
 	type ClientMessage,
 	type Direction,
+	type GameObjectState,
 	type PlayerState,
 	type ServerMessage,
 	ROOM_CONFIG,
@@ -19,10 +20,45 @@ interface PlayerSocketAttachment {
 
 export class GameRoom extends DurableObject {
 	private players: Map<string, PlayerConnection> = new Map();
+	private objects: Map<string, GameObjectState> = new Map();
 
 	constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
 		super(ctx, env);
 		this.rehydratePlayers();
+		this.initObjects();
+	}
+
+	private initObjects(): void {
+		if (this.objects.size > 0) return;
+
+		this.objects.set("workbench-1", {
+			id: "workbench-1",
+			objectType: "workbench",
+			items: [],
+		});
+
+		this.objects.set("storage-1", {
+			id: "storage-1",
+			objectType: "storage",
+			items: [
+				{ itemId: "timbangan-analitik", name: "Timbangan Analitik", quantity: 1 },
+				{ itemId: "piala-gelas", name: "Piala Gelas", quantity: 2 },
+				{ itemId: "pengaduk-kaca", name: "Pengaduk Kaca", quantity: 1 },
+				{ itemId: "hot-plate", name: "Hot Plate", quantity: 1 },
+				{ itemId: "corong-stand", name: "Corong + Stand", quantity: 1 },
+				{ itemId: "kertas-saring", name: "Kertas Saring Whatman", quantity: 3 },
+				{ itemId: "erlenmeyer", name: "Erlenmeyer", quantity: 1 },
+				{ itemId: "tabung-reaksi", name: "Tabung Reaksi", quantity: 2 },
+				{ itemId: "kertas-lakmus", name: "Kertas Lakmus Merah", quantity: 5 },
+				{ itemId: "krus-porselen", name: "Krus Porselen", quantity: 1 },
+				{ itemId: "terusi", name: "Terusi (CuSO4·5H2O)", quantity: 1 },
+				{ itemId: "air-suling", name: "Air Suling", quantity: 1 },
+				{ itemId: "h2so4", name: "H₂SO₄ 4N", quantity: 1 },
+				{ itemId: "naoh", name: "NaOH 4N", quantity: 1 },
+				{ itemId: "bacl2", name: "BaCl₂ 0,5N", quantity: 1 },
+				{ itemId: "hcl", name: "HCl 4N", quantity: 1 },
+			],
+		});
 	}
 
 	async fetch(request: Request): Promise<Response> {
@@ -69,6 +105,7 @@ export class GameRoom extends DurableObject {
 			direction: "down" as Direction,
 			vx: 0,
 			vy: 0,
+			holding: null,
 		};
 
 		this.players.set(user.id, {
@@ -82,6 +119,7 @@ export class GameRoom extends DurableObject {
 			type: "snapshot",
 			selfId: user.id,
 			players: Array.from(this.players.values()).map((p) => p.state),
+			objects: Array.from(this.objects.values()),
 		};
 		server.send(JSON.stringify(snapshot));
 
@@ -155,21 +193,13 @@ export class GameRoom extends DurableObject {
 		msg: ClientMessage,
 	): void {
 		switch (msg.type) {
-			case "signal": {
-				const target = this.players.get(msg.targetId);
-				if (target) {
-					try {
-						target.ws.send(
-							JSON.stringify({
-								type: "signal",
-								fromId: playerId,
-								signal: msg.signal,
-							}),
-						);
-					} catch {
-						// Target connection dead
-					}
-				}
+			case "chat": {
+				this.broadcast({
+					type: "chat",
+					playerId,
+					playerName: player.state.name,
+					text: msg.text,
+				});
 				break;
 			}
 			case "move": {
@@ -220,6 +250,89 @@ export class GameRoom extends DurableObject {
 				);
 				break;
 			}
+			case "take_item": {
+				// Player must not already be holding something
+				if (player.state.holding) {
+					this.sendError(player.ws, "Kamu sudah memegang sesuatu");
+					break;
+				}
+
+				const srcObj = this.objects.get(msg.objectId);
+				if (!srcObj) break;
+
+				const srcItem = srcObj.items.find(
+					(i) => i.itemId === msg.itemId && i.quantity > 0,
+				);
+				if (!srcItem) {
+					this.sendError(player.ws, "Item tidak tersedia");
+					break;
+				}
+
+				// Decrement from object
+				srcItem.quantity -= 1;
+
+				// Player holds the item
+				player.state.holding = msg.itemId;
+				this.persistPlayerState(player.ws, player.state);
+
+				// Broadcast both changes
+				this.broadcast({
+					type: "object_items_changed",
+					objectId: msg.objectId,
+					items: srcObj.items,
+				});
+				this.broadcast({
+					type: "player_hold",
+					playerId,
+					item: msg.itemId,
+				});
+				break;
+			}
+			case "place_item": {
+				// Player must be holding something
+				if (!player.state.holding) {
+					this.sendError(player.ws, "Kamu tidak memegang apa-apa");
+					break;
+				}
+
+				const destObj = this.objects.get(msg.objectId);
+				if (!destObj) break;
+
+				const heldItemId = player.state.holding;
+
+				// Add to destination object
+				const existing = destObj.items.find(
+					(i) => i.itemId === heldItemId,
+				);
+				if (existing) {
+					existing.quantity += 1;
+				} else {
+					// Need the item name — find it from any object or use itemId
+					const itemName = this.findItemName(heldItemId);
+					destObj.items.push({
+						itemId: heldItemId,
+						name: itemName,
+						quantity: 1,
+					});
+				}
+
+				// Player no longer holding
+				player.state.holding = null;
+				this.persistPlayerState(player.ws, player.state);
+
+				// Broadcast both changes
+				this.broadcast({
+					type: "object_items_changed",
+					objectId: msg.objectId,
+					items: destObj.items,
+				});
+				this.broadcast({
+					type: "player_hold",
+					playerId,
+					item: null,
+				});
+				break;
+			}
 		}
 	}
 
@@ -255,6 +368,20 @@ export class GameRoom extends DurableObject {
 				state: playerState,
 			});
 		}
+	}
+
+	private sendError(ws: WebSocket, message: string): void {
+		ws.send(
+			JSON.stringify({ type: "error", message } satisfies ServerMessage),
+		);
+	}
+
+	private findItemName(itemId: string): string {
+		for (const obj of this.objects.values()) {
+			const item = obj.items.find((i) => i.itemId === itemId);
+			if (item) return item.name;
+		}
+		return itemId;
 	}
 
 	private persistPlayerState(ws: WebSocket, playerState: PlayerState): void {

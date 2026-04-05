@@ -4,6 +4,8 @@ import type {
 	PlayerState,
 	ServerMessage,
 	Direction,
+	GameObjectState,
+	GameObjectType,
 } from "@/lib/protocol";
 import { ROOM_CONFIG } from "@/lib/protocol";
 import type { UIScene } from "./UIScene";
@@ -12,9 +14,16 @@ import type { UIScene } from "./UIScene";
 const CAMERA_ZOOM = 3;
 const PLAYER_SPEED = ROOM_CONFIG.PLAYER_SPEED;
 
+interface ChatBubble {
+	text: Phaser.GameObjects.Text;
+	timer: Phaser.Time.TimerEvent;
+}
+
 interface RemotePlayerData {
 	sprite: Phaser.GameObjects.Sprite;
 	nameTag: Phaser.GameObjects.Text;
+	holdingTag: Phaser.GameObjects.Text;
+	chatBubble: ChatBubble | null;
 	targetX: number;
 	targetY: number;
 	direction: Direction;
@@ -30,8 +39,11 @@ export class LabScene extends Phaser.Scene {
 	// Local player
 	private localPlayer!: Phaser.GameObjects.Sprite;
 	private nameTag!: Phaser.GameObjects.Text;
+	private holdingTag!: Phaser.GameObjects.Text;
+	private localChatBubble: ChatBubble | null = null;
 	private lastDirection: Direction = "down";
 	private isMoving = false;
+	private ready = false; // true after snapshot received
 
 	// Remote players
 	private remotePlayers: Map<string, RemotePlayerData> = new Map();
@@ -50,6 +62,18 @@ export class LabScene extends Phaser.Scene {
 	// Collision grid: true = blocked tile
 	private blocked!: boolean[][];
 
+	// Interactable objects
+	private interactables: {
+		id: string;
+		objectType: GameObjectType;
+		x: number;
+		y: number;
+		sprite: Phaser.GameObjects.Sprite;
+		label: Phaser.GameObjects.Text;
+	}[] = [];
+	private interactKey!: Phaser.Input.Keyboard.Key;
+	private nearbyObjectId: string | null = null;
+
 	// Network
 	private unsubscribe: (() => void) | null = null;
 
@@ -65,8 +89,10 @@ export class LabScene extends Phaser.Scene {
 	}
 
 	update(_time: number, delta: number) {
+		if (!this.ready) return;
 		this.handleInput(delta);
 		this.interpolateRemotePlayers(delta);
+		this.checkProximity();
 	}
 
 	// ── Map ───────────────────────────────────────
@@ -103,6 +129,66 @@ export class LabScene extends Phaser.Scene {
 					this.blocked[row][col] = true;
 				}
 			}
+		}
+
+		// ── Interactable Objects ──
+		const invScale = 1 / CAMERA_ZOOM;
+		const centerCol = Math.floor(MAP_COLS / 2);
+		const centerRow = Math.floor(MAP_ROWS / 2);
+
+		const objectDefs: {
+			id: string;
+			objectType: GameObjectType;
+			texture: string;
+			col: number;
+			row: number;
+		}[] = [
+			{
+				id: "workbench-1",
+				objectType: "workbench",
+				texture: "workbench",
+				col: centerCol,
+				row: centerRow - 2,
+			},
+			{
+				id: "storage-1",
+				objectType: "storage",
+				texture: "storage",
+				col: centerCol + 2,
+				row: centerRow - 2,
+			},
+		];
+
+		for (const def of objectDefs) {
+			const ox = tileX(def.col);
+			const oy = tileY(def.row);
+
+			const sprite = this.add
+				.sprite(ox, oy, def.texture)
+				.setDepth(5);
+
+			const label = this.add
+				.text(ox, oy - 20, "[E]", {
+					fontSize: "11px",
+					color: "#ffd43b",
+					backgroundColor: "#00000099",
+					padding: { x: 3, y: 1 },
+				})
+				.setOrigin(0.5, 1)
+				.setScale(invScale)
+				.setDepth(15)
+				.setVisible(false);
+
+			this.interactables.push({
+				id: def.id,
+				objectType: def.objectType,
+				x: ox,
+				y: oy,
+				sprite,
+				label,
+			});
+
+			this.blocked[def.row][def.col] = true;
 		}
 	}
 
@@ -154,6 +240,18 @@ export class LabScene extends Phaser.Scene {
 			.setScale(invScale)
 			.setDepth(11);
 
+		this.holdingTag = this.add
+			.text(centerX, centerY + 14, "", {
+				fontSize: "10px",
+				color: "#ffd43b",
+				backgroundColor: "#00000099",
+				padding: { x: 3, y: 1 },
+			})
+			.setOrigin(0.5, 0)
+			.setScale(invScale)
+			.setDepth(11)
+			.setVisible(false);
+
 		this.cameras.main.setZoom(CAMERA_ZOOM);
 		this.cameras.main.startFollow(this.localPlayer, true, 0.08, 0.08);
 		this.cameras.main.setBounds(
@@ -176,6 +274,9 @@ export class LabScene extends Phaser.Scene {
 				S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
 				D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
 			};
+			this.interactKey = this.input.keyboard.addKey(
+				Phaser.Input.Keyboard.KeyCodes.E,
+			);
 		}
 
 		// Listen for virtual joystick events from React component
@@ -244,6 +345,10 @@ export class LabScene extends Phaser.Scene {
 
 			this.localPlayer.setPosition(newX, newY);
 			this.nameTag.setPosition(newX, newY - 20);
+			this.holdingTag.setPosition(newX, newY + 14);
+			if (this.localChatBubble) {
+				this.localChatBubble.text.setPosition(newX, newY - 28);
+			}
 
 			let direction: Direction = this.lastDirection;
 			if (Math.abs(vx) > Math.abs(vy)) {
@@ -310,11 +415,28 @@ export class LabScene extends Phaser.Scene {
 						this.nameTag
 							.setText(p.name)
 							.setPosition(p.x, p.y - 20);
+						this.holdingTag.setPosition(p.x, p.y + 14);
+						this.updateLocalHolding(p.holding);
+						// Snap camera to player immediately (no lerp delay)
+						this.cameras.main.centerOn(p.x, p.y);
 						continue;
 					}
 					this.addRemotePlayer(p);
 				}
 
+				// Sync object states to React
+				for (const obj of msg.objects) {
+					window.dispatchEvent(
+						new CustomEvent("object-items-changed", {
+							detail: {
+								objectId: obj.id,
+								items: obj.items,
+							},
+						}),
+					);
+				}
+
+				this.ready = true;
 				this.updatePlayerCount();
 				break;
 			}
@@ -357,6 +479,44 @@ export class LabScene extends Phaser.Scene {
 				}
 				break;
 			}
+			case "chat": {
+				if (msg.playerId === gameClient.selfId) {
+					this.showLocalChatBubble(msg.text);
+				} else {
+					const remote = this.remotePlayers.get(msg.playerId);
+					if (remote) {
+						this.showRemoteChatBubble(remote, msg.text);
+					}
+				}
+				break;
+			}
+			case "player_hold": {
+				if (msg.playerId === gameClient.selfId) {
+					this.updateLocalHolding(msg.item);
+					window.dispatchEvent(
+						new CustomEvent("local-hold-changed", {
+							detail: { item: msg.item },
+						}),
+					);
+				} else {
+					const remote = this.remotePlayers.get(msg.playerId);
+					if (remote) {
+						this.updateRemoteHolding(remote, msg.item);
+					}
+				}
+				break;
+			}
+			case "object_items_changed": {
+				window.dispatchEvent(
+					new CustomEvent("object-items-changed", {
+						detail: {
+							objectId: msg.objectId,
+							items: msg.items,
+						},
+					}),
+				);
+				break;
+			}
 			case "error": {
 				console.warn("[Server]", msg.message);
 				break;
@@ -394,14 +554,34 @@ export class LabScene extends Phaser.Scene {
 			.setScale(invScale)
 			.setDepth(11);
 
-		this.remotePlayers.set(state.id, {
+		const holdingTag = this.add
+			.text(x, y + 14, "", {
+				fontSize: "10px",
+				color: "#ffd43b",
+				backgroundColor: "#00000099",
+				padding: { x: 3, y: 1 },
+			})
+			.setOrigin(0.5, 0)
+			.setScale(invScale)
+			.setDepth(11)
+			.setVisible(false);
+
+		const remoteData: RemotePlayerData = {
 			sprite,
 			nameTag,
+			holdingTag,
+			chatBubble: null,
 			targetX: x,
 			targetY: y,
 			direction: state.direction,
 			isMoving: moving,
-		});
+		};
+
+		if (state.holding) {
+			this.updateRemoteHolding(remoteData, state.holding);
+		}
+
+		this.remotePlayers.set(state.id, remoteData);
 	}
 
 	private removeRemotePlayer(playerId: string) {
@@ -409,6 +589,11 @@ export class LabScene extends Phaser.Scene {
 		if (remote) {
 			remote.sprite.destroy();
 			remote.nameTag.destroy();
+			remote.holdingTag.destroy();
+			if (remote.chatBubble) {
+				remote.chatBubble.timer.destroy();
+				remote.chatBubble.text.destroy();
+			}
 			this.remotePlayers.delete(playerId);
 		}
 	}
@@ -430,6 +615,134 @@ export class LabScene extends Phaser.Scene {
 			remote.nameTag.setPosition(
 				remote.sprite.x,
 				remote.sprite.y - 20,
+			);
+			remote.holdingTag.setPosition(
+				remote.sprite.x,
+				remote.sprite.y + 14,
+			);
+			if (remote.chatBubble) {
+				remote.chatBubble.text.setPosition(
+					remote.sprite.x,
+					remote.sprite.y - 28,
+				);
+			}
+		}
+	}
+
+	// ── Chat Bubbles ─────────────────────────────
+
+	private showLocalChatBubble(text: string) {
+		if (this.localChatBubble) {
+			this.localChatBubble.timer.destroy();
+			this.localChatBubble.text.destroy();
+		}
+
+		const invScale = 1 / CAMERA_ZOOM;
+		const bubble = this.add
+			.text(this.localPlayer.x, this.localPlayer.y - 28, text, {
+				fontSize: "12px",
+				color: "#ffffff",
+				backgroundColor: "#1e293bdd",
+				padding: { x: 6, y: 3 },
+				wordWrap: { width: 150 },
+				align: "center",
+			})
+			.setOrigin(0.5, 1)
+			.setScale(invScale)
+			.setDepth(20);
+
+		const timer = this.time.delayedCall(4000, () => {
+			bubble.destroy();
+			this.localChatBubble = null;
+		});
+
+		this.localChatBubble = { text: bubble, timer };
+	}
+
+	private showRemoteChatBubble(remote: RemotePlayerData, text: string) {
+		if (remote.chatBubble) {
+			remote.chatBubble.timer.destroy();
+			remote.chatBubble.text.destroy();
+		}
+
+		const invScale = 1 / CAMERA_ZOOM;
+		const bubble = this.add
+			.text(remote.sprite.x, remote.sprite.y - 28, text, {
+				fontSize: "12px",
+				color: "#ffffff",
+				backgroundColor: "#1e293bdd",
+				padding: { x: 6, y: 3 },
+				wordWrap: { width: 150 },
+				align: "center",
+			})
+			.setOrigin(0.5, 1)
+			.setScale(invScale)
+			.setDepth(20);
+
+		const timer = this.time.delayedCall(4000, () => {
+			bubble.destroy();
+			remote.chatBubble = null;
+		});
+
+		remote.chatBubble = { text: bubble, timer };
+	}
+
+	// ── Holding State ────────────────────────────
+
+	private updateLocalHolding(item: string | null) {
+		if (item) {
+			this.holdingTag.setText(item).setVisible(true);
+		} else {
+			this.holdingTag.setVisible(false);
+		}
+	}
+
+	private updateRemoteHolding(remote: RemotePlayerData, item: string | null) {
+		if (item) {
+			remote.holdingTag.setText(item).setVisible(true);
+		} else {
+			remote.holdingTag.setVisible(false);
+		}
+	}
+
+	// ── Interaction ──────────────────────────────
+
+	private checkProximity() {
+		const px = this.localPlayer.x;
+		const py = this.localPlayer.y;
+		const INTERACT_DIST = 40; // world pixels
+
+		let nearest: (typeof this.interactables)[number] | null = null;
+		let nearestDist = Infinity;
+
+		for (const obj of this.interactables) {
+			const dist = Math.hypot(obj.x - px, obj.y - py);
+			if (dist < INTERACT_DIST && dist < nearestDist) {
+				nearest = obj;
+				nearestDist = dist;
+			}
+		}
+
+		// Show/hide labels
+		for (const obj of this.interactables) {
+			obj.label.setVisible(obj === nearest);
+		}
+
+		this.nearbyObjectId = nearest?.id ?? null;
+
+		// Handle E key press
+		if (
+			nearest &&
+			this.interactKey &&
+			Phaser.Input.Keyboard.JustDown(this.interactKey)
+		) {
+			window.dispatchEvent(
+				new CustomEvent("object-interact", {
+					detail: {
+						objectId: nearest.id,
+						objectType: nearest.objectType,
+					},
+				}),
 			);
 		}
 	}

@@ -8,6 +8,21 @@ export interface PlayerState {
 	direction: Direction;
 	vx: number;
 	vy: number;
+	holding: string | null;
+}
+
+export type GameObjectType = "workbench" | "storage";
+
+export interface InventoryItem {
+	itemId: string;
+	name: string;
+	quantity: number;
+}
+
+export interface GameObjectState {
+	id: string;
+	objectType: GameObjectType;
+	items: InventoryItem[];
 }
 
 export type ClientMessage =
@@ -26,21 +41,25 @@ export type ClientMessage =
 			direction: Direction;
 	  }
 	| {
-			type: "signal";
-			targetId: string;
-			signal: RTCSignal;
+			type: "chat";
+			text: string;
+	  }
+	| {
+			type: "take_item";
+			objectId: string;
+			itemId: string;
+	  }
+	| {
+			type: "place_item";
+			objectId: string;
 	  };
-
-export type RTCSignal =
-	| { type: "offer"; sdp: string }
-	| { type: "answer"; sdp: string }
-	| { type: "ice-candidate"; candidate: string; sdpMid: string | null; sdpMLineIndex: number | null };
 
 export type ServerMessage =
 	| {
 			type: "snapshot";
 			selfId: string;
 			players: PlayerState[];
+			objects: GameObjectState[];
 	  }
 	| { type: "player_join"; player: PlayerState }
 	| { type: "player_leave"; playerId: string }
@@ -61,10 +80,16 @@ export type ServerMessage =
 			direction: Direction;
 	  }
 	| { type: "error"; message: string }
+	| { type: "chat"; playerId: string; playerName: string; text: string }
 	| {
-			type: "signal";
-			fromId: string;
-			signal: RTCSignal;
+			type: "object_items_changed";
+			objectId: string;
+			items: InventoryItem[];
+	  }
+	| {
+			type: "player_hold";
+			playerId: string;
+			item: string | null;
 	  };
 
 export const ROOM_CONFIG = {
