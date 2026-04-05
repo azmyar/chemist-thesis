@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { GameCanvas } from "./GameCanvas";
 import { ChatOverlay } from "./ChatOverlay";
+import { InteractButton } from "./InteractButton";
 import { ObjectSheet } from "./ObjectSheet";
 import { VirtualJoystick } from "./VirtualJoystick";
 import { gameClient } from "@/lib/network/client";
@@ -73,6 +74,7 @@ export default function GameView({ roomId, playerName }: GameViewProps) {
 			)}
 
 			{isMobile && <VirtualJoystick />}
+			{isMobile && <InteractButton />}
 		</div>
 	);
 }

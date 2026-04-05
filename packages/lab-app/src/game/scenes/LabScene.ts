@@ -290,12 +290,24 @@ export class LabScene extends Phaser.Scene {
 			this.joystickVy = 0;
 		};
 
+		// Mobile interact button event
+		const onMobileInteract = () => {
+			if (this.nearbyObjectId) {
+				const obj = this.interactables.find(
+					(o) => o.id === this.nearbyObjectId,
+				);
+				if (obj) this.triggerInteract(obj);
+			}
+		};
+
 		window.addEventListener("joystick-move", onJoystickMove);
 		window.addEventListener("joystick-stop", onJoystickStop);
+		window.addEventListener("mobile-interact", onMobileInteract);
 
 		this.events.on("shutdown", () => {
 			window.removeEventListener("joystick-move", onJoystickMove);
 			window.removeEventListener("joystick-stop", onJoystickStop);
+			window.removeEventListener("mobile-interact", onMobileInteract);
 		});
 	}
 
@@ -728,23 +740,42 @@ export class LabScene extends Phaser.Scene {
 			obj.label.setVisible(obj === nearest);
 		}
 
+		const prevNearby = this.nearbyObjectId;
 		this.nearbyObjectId = nearest?.id ?? null;
 
-		// Handle E key press
+		// Notify React when nearby object changes (for mobile button)
+		if (this.nearbyObjectId !== prevNearby) {
+			window.dispatchEvent(
+				new CustomEvent("nearby-object-changed", {
+					detail: nearest
+						? {
+								objectId: nearest.id,
+								objectType: nearest.objectType,
+							}
+						: null,
+				}),
+			);
+		}
+
+		// Handle E key press (desktop)
 		if (
 			nearest &&
 			this.interactKey &&
 			Phaser.Input.Keyboard.JustDown(this.interactKey)
 		) {
-			window.dispatchEvent(
-				new CustomEvent("object-interact", {
-					detail: {
-						objectId: nearest.id,
-						objectType: nearest.objectType,
-					},
-				}),
-			);
+			this.triggerInteract(nearest);
 		}
+	}
+
+	private triggerInteract(obj: (typeof this.interactables)[number]) {
+		window.dispatchEvent(
+			new CustomEvent("object-interact", {
+				detail: {
+					objectId: obj.id,
+					objectType: obj.objectType,
+				},
+			}),
+		);
 	}
 
 	// ── Helpers ───────────────────────────────────
