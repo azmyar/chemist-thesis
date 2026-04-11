@@ -1,5 +1,87 @@
 export type Direction = "up" | "down" | "left" | "right";
 
+export type ItemCategory = "alat" | "bahan";
+
+export interface ContainerContent {
+	itemId: string;
+	name: string;
+	weightGrams?: number;
+	volumeMl?: number;
+	dissolved?: boolean;
+}
+
+export interface LabContainerMeta {
+	sampleTerusiG?: number;
+	acidified?: boolean;
+	boiled?: boolean;
+	precipitated?: boolean;
+	stirred?: boolean;
+	precipitationChecked?: boolean;
+	filtered?: boolean;
+	washed?: boolean;
+	fromFiltrate?: boolean;
+	sulfateTestHclAdded?: boolean;
+	sulfateTestBaCl2Added?: boolean;
+	baseTested?: boolean;
+	dried?: boolean;
+	calcined?: boolean;
+	cooled?: boolean;
+	cuoMassG?: number;
+	lastRecordedMassG?: number;
+	reheatedAfterWeigh?: boolean;
+	setupFilterPaperAttached?: boolean;
+	setupReceiverAttached?: boolean;
+	setupReceiverItemId?: string;
+	setupReceiverName?: string;
+	setupReceiverMaxVolumeMl?: number;
+	setupReceiverContents?: ContainerContent[];
+	setupReceiverFromFiltrate?: boolean;
+}
+
+export interface InventoryItem {
+	itemId: string;
+	baseItemId?: string;
+	name: string;
+	category: ItemCategory;
+	quantity: number;
+	weightGrams?: number;
+	volumeMl?: number;
+	maxVolumeMl?: number;
+	contents?: ContainerContent[];
+	labMeta?: LabContainerMeta;
+}
+
+export interface HeldItem {
+	itemId: string;
+	baseItemId?: string;
+	name: string;
+	category: ItemCategory;
+	weightGrams?: number;
+	volumeMl?: number;
+	maxVolumeMl?: number;
+	contents?: ContainerContent[];
+	labMeta?: LabContainerMeta;
+}
+
+export interface LevelMilestone {
+	step: number;
+	title: string;
+	completed: boolean;
+	completedAt?: number;
+	detail?: string;
+}
+
+export interface LevelState {
+	levelId: string;
+	title: string;
+	xp: number;
+	finished: boolean;
+	milestones: LevelMilestone[];
+	startedAt: number;
+	updatedAt: number;
+	lastEvent?: string;
+}
+
 export interface PlayerState {
 	id: string;
 	name: string;
@@ -8,16 +90,10 @@ export interface PlayerState {
 	direction: Direction;
 	vx: number;
 	vy: number;
-	holding: string | null;
+	holding: HeldItem[];
 }
 
-export type GameObjectType = "workbench" | "storage";
-
-export interface InventoryItem {
-	itemId: string;
-	name: string;
-	quantity: number;
-}
+export type GameObjectType = "workbench" | "storage" | "reagent_table" | "timbangan" | "oven" | "furnace";
 
 export interface GameObjectState {
 	id: string;
@@ -40,18 +116,36 @@ export type ClientMessage =
 			y: number;
 			direction: Direction;
 	  }
+	| { type: "chat"; text: string }
+	| { type: "take_item"; objectId: string; itemId: string }
+	| { type: "place_item"; objectId: string; itemId: string }
+	| { type: "weigh_item"; transferGrams: number }
 	| {
-			type: "chat";
-			text: string;
+			type: "pour_item";
+			objectId: string;
+			sourceItemId: string;
+			targetItemId: string;
+			transferMl: number;
 	  }
 	| {
-			type: "take_item";
+			type: "dissolve_item";
 			objectId: string;
-			itemId: string;
+			sourceContainerItemId: string;
+			targetContainerItemId: string;
 	  }
+	| { type: "combine_items"; objectId: string; itemIdA: string; itemIdB: string }
 	| {
-			type: "place_item";
+			type: "record_mass";
+			containerItemId: string;
+			measuredMassG: number;
+	  }
+	| { type: "discard_object_contents"; objectId: string; itemId: string }
+	| { type: "discard_held_contents"; itemId: string }
+	| {
+			type: "detach_setup_part";
 			objectId: string;
+			setupItemId: string;
+			part: "filter" | "receiver" | "all";
 	  };
 
 export type ServerMessage =
@@ -89,7 +183,11 @@ export type ServerMessage =
 	| {
 			type: "player_hold";
 			playerId: string;
-			item: string | null;
+			holding: HeldItem[];
+	  }
+	| {
+			type: "level_state";
+			level: LevelState;
 	  };
 
 export const ROOM_CONFIG = {

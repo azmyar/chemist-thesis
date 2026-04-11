@@ -6,6 +6,10 @@ import type { GameObjectType } from "@/lib/protocol";
 const OBJECT_LABELS: Record<GameObjectType, string> = {
 	workbench: "Meja Kerja",
 	storage: "Penyimpanan",
+	reagent_table: "Pereaksi",
+	timbangan: "Timbangan",
+	oven: "Oven",
+	furnace: "Tanur",
 };
 
 export function InteractButton() {

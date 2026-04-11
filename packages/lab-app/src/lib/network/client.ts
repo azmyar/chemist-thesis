@@ -34,6 +34,7 @@ export class GameClient {
 		state: "idle",
 		message: null,
 	};
+	private readonly sessionId: string = this.getOrCreateSessionId();
 	/** Buffer messages until at least one handler subscribes */
 	private pendingMessages: ServerMessage[] = [];
 
@@ -117,9 +118,12 @@ export class GameClient {
 		// When connecting via Next.js proxy (same origin), use /ws/ prefix that gets stripped by rewrite.
 		// When connecting directly to lab-server (explicit URL), use server route directly.
 		const prefix = process.env.NEXT_PUBLIC_WS_URL ? "" : "/ws";
-		const query = this.playerName
-			? `?name=${encodeURIComponent(this.playerName.trim())}`
-			: "";
+		const params = new URLSearchParams();
+		if (this.playerName?.trim()) {
+			params.set("name", this.playerName.trim());
+		}
+		params.set("sid", this.sessionId);
+		const query = `?${params.toString()}`;
 		const url = `${wsUrl}${prefix}/room/${this.roomId}${query}`;
 		const socket = new WebSocket(url);
 
@@ -207,6 +211,22 @@ export class GameClient {
 		if (!this.reconnectTimer) return;
 		clearTimeout(this.reconnectTimer);
 		this.reconnectTimer = null;
+	}
+
+	private getOrCreateSessionId(): string {
+		if (typeof window === "undefined") {
+			return `guest-${Math.random().toString(36).slice(2, 12)}`;
+		}
+
+		const storageKey = "chemist-lab-session-id";
+		const existing = window.sessionStorage.getItem(storageKey);
+		if (existing && /^[a-z0-9-]{4,64}$/.test(existing)) {
+			return existing;
+		}
+
+		const created = `guest-${Math.random().toString(36).slice(2, 12)}`;
+		window.sessionStorage.setItem(storageKey, created);
+		return created;
 	}
 }
 

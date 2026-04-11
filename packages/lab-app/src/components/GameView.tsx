@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { GameCanvas } from "./GameCanvas";
 import { ChatOverlay } from "./ChatOverlay";
 import { InteractButton } from "./InteractButton";
+import { LevelOverlay } from "./LevelOverlay";
 import { ObjectSheet } from "./ObjectSheet";
 import { VirtualJoystick } from "./VirtualJoystick";
 import { gameClient } from "@/lib/network/client";
@@ -55,6 +56,7 @@ export default function GameView({ roomId, playerName }: GameViewProps) {
 		<div className="relative w-screen h-screen overflow-hidden">
 			<GameCanvas roomId={roomId} />
 
+			{connected && <LevelOverlay />}
 			{connected && <ChatOverlay />}
 			{connected && <ObjectSheet />}
 

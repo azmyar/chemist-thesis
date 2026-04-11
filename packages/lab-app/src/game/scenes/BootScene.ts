@@ -263,6 +263,69 @@ export class BootScene extends Phaser.Scene {
 		sCtx.fillRect(3, 3, 26, 1);
 		stor.refresh();
 
+		// Reagent table — 32×32 clean white with colored bottles
+		const rt = this.textures.createCanvas("reagent-table", 32, 32)!;
+		const rtCtx = rt.context;
+		// Table top
+		rtCtx.fillStyle = "#f8f9fa";
+		rtCtx.fillRect(0, 4, 32, 16);
+		rtCtx.fillStyle = "#ffffff";
+		rtCtx.fillRect(1, 4, 30, 2);
+		rtCtx.fillStyle = "#dee2e6";
+		rtCtx.fillRect(0, 3, 32, 1);
+		// Side edges
+		rtCtx.fillStyle = "#e9ecef";
+		rtCtx.fillRect(0, 6, 1, 14);
+		rtCtx.fillRect(31, 6, 1, 14);
+		// Legs
+		rtCtx.fillStyle = "#ced4da";
+		rtCtx.fillRect(2, 20, 3, 12);
+		rtCtx.fillRect(27, 20, 3, 12);
+		rtCtx.fillStyle = "#e9ecef";
+		rtCtx.fillRect(3, 20, 1, 11);
+		rtCtx.fillRect(28, 20, 1, 11);
+		// Bottom shadow
+		rtCtx.fillStyle = "#dee2e6";
+		rtCtx.fillRect(0, 19, 32, 1);
+		// Reagent bottles on top
+		rtCtx.fillStyle = "#74c0fc";
+		rtCtx.fillRect(6, 1, 3, 3);
+		rtCtx.fillStyle = "#ffd43b";
+		rtCtx.fillRect(12, 1, 3, 3);
+		rtCtx.fillStyle = "#ff8787";
+		rtCtx.fillRect(18, 1, 3, 3);
+		rtCtx.fillStyle = "#69db7c";
+		rtCtx.fillRect(24, 2, 3, 2);
+		rt.refresh();
+
+		// Timbangan (Analytical Balance) — 32×32
+		const tb = this.textures.createCanvas("timbangan", 32, 32)!;
+		const tbCtx = tb.context;
+		// Base platform
+		tbCtx.fillStyle = "#e9ecef";
+		tbCtx.fillRect(2, 20, 28, 10);
+		tbCtx.fillStyle = "#f8f9fa";
+		tbCtx.fillRect(3, 20, 26, 2);
+		// Body
+		tbCtx.fillStyle = "#dee2e6";
+		tbCtx.fillRect(8, 8, 16, 12);
+		tbCtx.fillStyle = "#f1f3f5";
+		tbCtx.fillRect(9, 9, 14, 10);
+		// Display screen
+		tbCtx.fillStyle = "#212529";
+		tbCtx.fillRect(11, 10, 10, 5);
+		tbCtx.fillStyle = "#51cf66";
+		tbCtx.fillRect(12, 11, 4, 3);
+		// Weighing pan
+		tbCtx.fillStyle = "#adb5bd";
+		tbCtx.fillRect(6, 6, 20, 2);
+		tbCtx.fillStyle = "#ced4da";
+		tbCtx.fillRect(8, 4, 16, 2);
+		// Border
+		tbCtx.fillStyle = "#ced4da";
+		tbCtx.fillRect(2, 30, 28, 1);
+		tb.refresh();
+
 		// Fume hood — 64×64
 		const fh = this.textures.createCanvas("fume-hood", 64, 64)!;
 		const fhCtx = fh.context;

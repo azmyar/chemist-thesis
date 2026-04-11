@@ -4,8 +4,8 @@ import type {
 	PlayerState,
 	ServerMessage,
 	Direction,
-	GameObjectState,
 	GameObjectType,
+	HeldItem,
 } from "@/lib/protocol";
 import { ROOM_CONFIG } from "@/lib/protocol";
 import type { UIScene } from "./UIScene";
@@ -156,6 +156,34 @@ export class LabScene extends Phaser.Scene {
 				texture: "storage",
 				col: centerCol + 2,
 				row: centerRow - 2,
+			},
+			{
+				id: "reagent-table-1",
+				objectType: "reagent_table",
+				texture: "reagent-table",
+				col: centerCol - 2,
+				row: centerRow - 2,
+			},
+			{
+				id: "timbangan-1",
+				objectType: "timbangan",
+				texture: "timbangan",
+				col: centerCol,
+				row: centerRow - 4,
+			},
+			{
+				id: "oven-1",
+				objectType: "oven",
+				texture: "oven",
+				col: centerCol + 2,
+				row: centerRow - 4,
+			},
+			{
+				id: "furnace-1",
+				objectType: "furnace",
+				texture: "furnace",
+				col: centerCol - 2,
+				row: centerRow - 4,
 			},
 		];
 
@@ -504,16 +532,16 @@ export class LabScene extends Phaser.Scene {
 			}
 			case "player_hold": {
 				if (msg.playerId === gameClient.selfId) {
-					this.updateLocalHolding(msg.item);
+					this.updateLocalHolding(msg.holding);
 					window.dispatchEvent(
 						new CustomEvent("local-hold-changed", {
-							detail: { item: msg.item },
+							detail: { holding: msg.holding },
 						}),
 					);
 				} else {
 					const remote = this.remotePlayers.get(msg.playerId);
 					if (remote) {
-						this.updateRemoteHolding(remote, msg.item);
+						this.updateRemoteHolding(remote, msg.holding);
 					}
 				}
 				break;
@@ -525,6 +553,14 @@ export class LabScene extends Phaser.Scene {
 							objectId: msg.objectId,
 							items: msg.items,
 						},
+					}),
+				);
+				break;
+			}
+			case "level_state": {
+				window.dispatchEvent(
+					new CustomEvent("level-state", {
+						detail: msg.level,
 					}),
 				);
 				break;
@@ -589,7 +625,7 @@ export class LabScene extends Phaser.Scene {
 			isMoving: moving,
 		};
 
-		if (state.holding) {
+		if (state.holding.length > 0) {
 			this.updateRemoteHolding(remoteData, state.holding);
 		}
 
@@ -701,17 +737,19 @@ export class LabScene extends Phaser.Scene {
 
 	// ── Holding State ────────────────────────────
 
-	private updateLocalHolding(item: string | null) {
-		if (item) {
-			this.holdingTag.setText(item).setVisible(true);
+	private updateLocalHolding(holding: HeldItem[]) {
+		if (holding.length > 0) {
+			const names = holding.map((h) => h.name).join(", ");
+			this.holdingTag.setText(names).setVisible(true);
 		} else {
 			this.holdingTag.setVisible(false);
 		}
 	}
 
-	private updateRemoteHolding(remote: RemotePlayerData, item: string | null) {
-		if (item) {
-			remote.holdingTag.setText(item).setVisible(true);
+	private updateRemoteHolding(remote: RemotePlayerData, holding: HeldItem[]) {
+		if (holding.length > 0) {
+			const names = holding.map((h) => h.name).join(", ");
+			remote.holdingTag.setText(names).setVisible(true);
 		} else {
 			remote.holdingTag.setVisible(false);
 		}

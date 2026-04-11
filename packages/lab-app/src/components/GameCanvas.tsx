@@ -47,7 +47,9 @@ export function GameCanvas({ roomId }: GameCanvasProps) {
 			gameRef.current.registry.set("roomId", roomId);
 		};
 
-		initGame();
+		initGame().catch((error) => {
+			console.error("[GameCanvas] Failed to initialize game", error);
+		});
 
 		return () => {
 			gameRef.current?.destroy(true);
