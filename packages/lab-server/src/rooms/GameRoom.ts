@@ -2,13 +2,16 @@ import { DurableObject } from "cloudflare:workers";
 import {
 	type ClientMessage,
 	type ContainerContent,
+	type DecisionValue,
 	type Direction,
 	type GameObjectState,
 	type HeldItem,
 	type InventoryItem,
 	type LabContainerMeta,
+	type LevelReport,
 	type LevelState,
 	type PlayerState,
+	type ReportIssue,
 	type ServerMessage,
 	ROOM_CONFIG,
 	clientMessageSchema,
@@ -35,6 +38,8 @@ const LEVEL_ID = "gravimetri-terusi";
 const LEVEL_TITLE = "Penetapan Kadar Tembaga dalam Terusi - Metode Gravimetri";
 const CUO_FROM_TERUSI_RATIO = 0.3186;
 const CUOH2_FROM_TERUSI_RATIO = 0.3907;
+const GRAVIMETRIC_FACTOR_CU_CUO = 0.7987;
+const THEORETICAL_CU_PERCENT = 25.45;
 
 const LEVEL_MILESTONES = [
 	"Timbang terusi ±0,5g ke kaca arloji",
@@ -60,7 +65,12 @@ type ContainerLike = InventoryItem | HeldItem;
 export class GameRoom extends DurableObject {
 	private players: Map<string, PlayerConnection> = new Map();
 	private objects: Map<string, GameObjectState> = new Map();
-	private levelState: LevelState | null = null;
+	/**
+	 * Per-player level state. Each student tracks their own milestone progress
+	 * independently — one player completing step 5 does not advance others.
+	 * Keyed by playerId. Lazily loaded from storage on first access.
+	 */
+	private levelStates: Map<string, LevelState> = new Map();
 	private rateWindows: Map<string, RateWindow> = new Map();
 
 	constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
@@ -86,11 +96,10 @@ export class GameRoom extends DurableObject {
 	}
 
 	private async loadState(): Promise<void> {
-		if (this.objects.size > 0 && this.levelState) return;
+		if (this.objects.size > 0) return;
 		let shouldPersist = false;
 
 		const storedObjects = await this.ctx.storage.get<Record<string, GameObjectState>>("objects");
-		const storedLevel = await this.ctx.storage.get<LevelState>("levelState");
 
 		if (storedObjects && Object.keys(storedObjects).length > 0) {
 			for (const [id, obj] of Object.entries(storedObjects)) {
@@ -109,6 +118,14 @@ export class GameRoom extends DurableObject {
 			});
 			shouldPersist = true;
 		}
+		if (!this.objects.has("oven-2")) {
+			this.objects.set("oven-2", {
+				id: "oven-2",
+				objectType: "oven",
+				items: [],
+			});
+			shouldPersist = true;
+		}
 		if (!this.objects.has("furnace-1")) {
 			this.objects.set("furnace-1", {
 				id: "furnace-1",
@@ -118,48 +135,112 @@ export class GameRoom extends DurableObject {
 			shouldPersist = true;
 		}
 
+		// Migration: add workbench-2..40 for rooms created before the 40-bench layout.
+		for (let i = 2; i <= 40; i++) {
+			const id = `workbench-${i}`;
+			if (!this.objects.has(id)) {
+				this.objects.set(id, { id, objectType: "workbench", items: [] });
+				shouldPersist = true;
+			}
+		}
+
+		// Ensure multiple timbangan exist (migration for rooms created before
+		// concurrency support). Adds timbangan-2..6 if missing.
+		for (let i = 2; i <= 6; i++) {
+			const id = `timbangan-${i}`;
+			if (!this.objects.has(id)) {
+				this.objects.set(id, { id, objectType: "timbangan", items: [] });
+				shouldPersist = true;
+			}
+		}
+
 		if (this.splitWorkbenchStacks()) {
 			shouldPersist = true;
 		}
 
-		if (storedLevel && Array.isArray(storedLevel.milestones) && storedLevel.milestones.length === 14) {
-			this.levelState = storedLevel;
-		} else {
-			this.levelState = this.createDefaultLevelState();
+		// Migration: append reagent variants introduced in later versions to
+		// existing rooms so persisted state doesn't lock students to an old
+		// reagent set.
+		if (this.ensureReagentVariants()) {
 			shouldPersist = true;
 		}
 
-		if (shouldPersist || !storedObjects || !storedLevel) {
-			await this.persistState();
+		if (shouldPersist || !storedObjects) {
+			await this.persistObjects();
 		}
 	}
 
-	private async persistState(): Promise<void> {
+	/**
+	 * Load (or initialize) a specific player's level state. Called on connect
+	 * and whenever a handler needs to read/write progress for that player.
+	 */
+	private async ensurePlayerLevelState(playerId: string): Promise<LevelState> {
+		const cached = this.levelStates.get(playerId);
+		if (cached) return cached;
+
+		const stored = await this.ctx.storage.get<LevelState>(`levelState:${playerId}`);
+		if (stored && Array.isArray(stored.milestones) && stored.milestones.length === 14) {
+			this.levelStates.set(playerId, stored);
+			return stored;
+		}
+
+		const fresh = this.createDefaultLevelState();
+		this.levelStates.set(playerId, fresh);
+		await this.ctx.storage.put(`levelState:${playerId}`, fresh);
+		return fresh;
+	}
+
+	private async persistObjects(): Promise<void> {
 		const data: Record<string, GameObjectState> = {};
 		for (const [id, obj] of this.objects) {
 			data[id] = obj;
 		}
 		await this.ctx.storage.put("objects", data);
-		if (this.levelState) {
-			await this.ctx.storage.put("levelState", this.levelState);
+	}
+
+	private async persistPlayerLevelState(playerId: string): Promise<void> {
+		const state = this.levelStates.get(playerId);
+		if (state) {
+			await this.ctx.storage.put(`levelState:${playerId}`, state);
 		}
 	}
 
-	private initDefaults(): void {
-		this.objects.set("workbench-1", {
-			id: "workbench-1",
-			objectType: "workbench",
-			items: [],
-		});
+	/** Legacy callsites used to persist both objects + levelState together.
+	 *  Kept as a thin alias for now — prefer persistObjects() or
+	 *  persistPlayerLevelState() explicitly. */
+	private async persistState(): Promise<void> {
+		await this.persistObjects();
+	}
 
-		this.objects.set("timbangan-1", {
-			id: "timbangan-1",
-			objectType: "timbangan",
-			items: [],
-		});
+	private initDefaults(): void {
+		// 40 workbench tiles: 4 pairs × 2 cols × 5 rows — each tile is an
+		// independent workbench so every student has their own bench slot.
+		for (let i = 1; i <= 40; i++) {
+			this.objects.set(`workbench-${i}`, {
+				id: `workbench-${i}`,
+				objectType: "workbench",
+				items: [],
+			});
+		}
+
+		// Multiple timbangan instances to support concurrent weighing by many
+		// students (lab can host up to 10+ players simultaneously).
+		for (let i = 1; i <= 6; i++) {
+			this.objects.set(`timbangan-${i}`, {
+				id: `timbangan-${i}`,
+				objectType: "timbangan",
+				items: [],
+			});
+		}
 
 		this.objects.set("oven-1", {
 			id: "oven-1",
+			objectType: "oven",
+			items: [],
+		});
+
+		this.objects.set("oven-2", {
+			id: "oven-2",
 			objectType: "oven",
 			items: [],
 		});
@@ -196,10 +277,41 @@ export class GameRoom extends DurableObject {
 				{ itemId: "air-suling", name: "Air Suling", category: "bahan", quantity: 1, volumeMl: 500 },
 				{ itemId: "h2so4", name: "H2SO4 4N", category: "bahan", quantity: 1, volumeMl: 100 },
 				{ itemId: "naoh", name: "NaOH 4N", category: "bahan", quantity: 1, volumeMl: 100 },
+				{ itemId: "naoh-1n", name: "NaOH 1N (encer)", category: "bahan", quantity: 1, volumeMl: 100 },
+				{ itemId: "naoh-8n", name: "NaOH 8N (pekat)", category: "bahan", quantity: 1, volumeMl: 100 },
+				{ itemId: "koh-4n", name: "KOH 4N", category: "bahan", quantity: 1, volumeMl: 100 },
+				{ itemId: "nh4oh-4n", name: "NH4OH 4N (amonia)", category: "bahan", quantity: 1, volumeMl: 100 },
 				{ itemId: "bacl2", name: "BaCl2 0,5N", category: "bahan", quantity: 1, volumeMl: 50 },
 				{ itemId: "hcl", name: "HCl 4N", category: "bahan", quantity: 1, volumeMl: 50 },
 			],
 		});
+	}
+
+	/**
+	 * Idempotent migration: ensure every required reagent exists on the reagent
+	 * table. Safe to call on every loadState — returns true if any item was
+	 * added so the caller can persist state.
+	 */
+	private ensureReagentVariants(): boolean {
+		const table = this.objects.get("reagent-table-1");
+		if (!table) return false;
+
+		const required: InventoryItem[] = [
+			{ itemId: "naoh-1n", name: "NaOH 1N (encer)", category: "bahan", quantity: 1, volumeMl: 100 },
+			{ itemId: "naoh-8n", name: "NaOH 8N (pekat)", category: "bahan", quantity: 1, volumeMl: 100 },
+			{ itemId: "koh-4n", name: "KOH 4N", category: "bahan", quantity: 1, volumeMl: 100 },
+			{ itemId: "nh4oh-4n", name: "NH4OH 4N (amonia)", category: "bahan", quantity: 1, volumeMl: 100 },
+		];
+
+		let changed = false;
+		for (const item of required) {
+			const exists = table.items.some((i) => this.itemKind(i) === item.itemId);
+			if (!exists) {
+				table.items.push(item);
+				changed = true;
+			}
+		}
+		return changed;
 	}
 
 	private sanitizePlayerName(raw?: string | null): string {
@@ -223,6 +335,122 @@ export class GameRoom extends DurableObject {
 	private ensureLabMeta<T extends { labMeta?: LabContainerMeta }>(item: T): LabContainerMeta {
 		if (!item.labMeta) item.labMeta = {};
 		return item.labMeta;
+	}
+
+	/**
+	 * Log a student decision into the container's labMeta.decisions map.
+	 * Decisions are flat key/value; keys are free-form but should follow
+	 * `<step>.<field>` convention (e.g. "weigh.sampleType", "naoh.normality").
+	 */
+	private logDecision<T extends { labMeta?: LabContainerMeta }>(
+		item: T,
+		key: string,
+		value: DecisionValue,
+	): void {
+		const meta = this.ensureLabMeta(item);
+		if (!meta.decisions) meta.decisions = {};
+		meta.decisions[key] = value;
+	}
+
+	/**
+	 * Append an issue code to outcomes (deduped). Issue codes are consumed by
+	 * computeLevelReport and mapped to user-facing explanations in the UI.
+	 */
+	private logIssue<T extends { labMeta?: LabContainerMeta }>(item: T, code: string): void {
+		const meta = this.ensureLabMeta(item);
+		if (!meta.outcomes) meta.outcomes = {};
+		if (!meta.outcomes.issues) meta.outcomes.issues = [];
+		if (!meta.outcomes.issues.includes(code)) {
+			meta.outcomes.issues.push(code);
+		}
+	}
+
+	/**
+	 * Remove an issue code (used when student corrects a prior mistake, e.g.
+	 * re-washes after sulfate test positive).
+	 */
+	private clearIssue<T extends { labMeta?: LabContainerMeta }>(item: T, code: string): void {
+		const issues = item.labMeta?.outcomes?.issues;
+		if (!issues) return;
+		const idx = issues.indexOf(code);
+		if (idx >= 0) issues.splice(idx, 1);
+	}
+
+	/**
+	 * Build the final report shown after milestone 14.
+	 * Skeleton only — per-step handlers populate decisions/issues, and
+	 * per-step logic in applyCalcination adjusts cuoMassG. Deviation analysis
+	 * grows as more steps get wired in.
+	 */
+	private computeLevelReport(container: ContainerLike): LevelReport {
+		const meta = container.labMeta ?? {};
+		const sampleMassG = this.round4(meta.sampleTerusiG ?? 0);
+		const cuoMassG = this.round4(meta.cuoMassG ?? 0);
+		const kadarRaw = sampleMassG > 0 ? (cuoMassG * GRAVIMETRIC_FACTOR_CU_CUO) / sampleMassG * 100 : 0;
+		const kadarPercent = Math.round(kadarRaw * 100) / 100;
+		const deviationPercent = Math.round((kadarPercent - THEORETICAL_CU_PERCENT) * 100) / 100;
+
+		// Recompute per-issue impacts using the same rules as applyCalcination so
+		// the report can attribute deviation to specific student decisions.
+		const issueCodes = meta.outcomes?.issues ?? [];
+		const idealCuo = this.round4(sampleMassG * CUO_FROM_TERUSI_RATIO);
+		const { perIssueImpact } = this.applyIssueEffects(idealCuo, issueCodes);
+
+		const decisions = meta.decisions ?? {};
+		const issues: ReportIssue[] = issueCodes.map((code) => ({
+			code,
+			impactMassG: perIssueImpact[code] ?? 0,
+			decisionSummary: this.summarizeDecisionForIssue(code, decisions),
+		}));
+
+		return {
+			levelId: LEVEL_ID,
+			sampleMassG,
+			cuoMassG,
+			gravimetricFactor: GRAVIMETRIC_FACTOR_CU_CUO,
+			kadarPercent,
+			theoreticalPercent: THEORETICAL_CU_PERCENT,
+			deviationPercent,
+			issues,
+			decisions,
+			generatedAt: Date.now(),
+		};
+	}
+
+	/** Free-form contextual note per issue, composed from decisions so the
+	 * report can show the student *what they did* that triggered the issue. */
+	private summarizeDecisionForIssue(code: string, decisions: Record<string, DecisionValue>): string {
+		switch (code) {
+			case "weigh.out_of_range":
+				return `Massa sampel ${decisions["weigh.sampleMassG"] ?? "?"} g`;
+			case "weigh.non_canonical_container":
+				return `Wadah: ${decisions["weigh.container"] ?? "bukan kaca arloji"}`;
+			case "dissolve.insufficient_water":
+				return `Volume air: ${decisions["dissolve.waterVolumeMl"] ?? "?"} mL`;
+			case "acidify.insufficient":
+				return `Volume H2SO4: ${decisions["acidify.h2so4VolumeMl"] ?? "?"} mL`;
+			case "boil.no_acidify":
+				return "Pendidihan tanpa pengasaman";
+			case "precipitate.nh4oh_complex":
+				return "Pereaksi pengendap: NH4OH";
+			case "precipitate.koh_residue":
+				return "Pereaksi pengendap: KOH";
+			case "precipitate.too_concentrated":
+				return `Normalitas: ${decisions["precipitate.normality"] ?? "8N"}`;
+			case "precipitate.rapid_addition":
+				return "Penambahan pereaksi tidak tetes demi tetes";
+			default:
+				return code;
+		}
+	}
+
+	/**
+	 * Send a level_report to the specific player whose container it is. Called
+	 * when the final milestone (14: bobot tetap) completes for that player.
+	 */
+	private broadcastLevelReport(playerId: string, container: ContainerLike): void {
+		const report = this.computeLevelReport(container);
+		this.sendTo(playerId, { type: "level_report", report });
 	}
 
 	private ensureContents(item: ContainerLike): ContainerContent[] {
@@ -495,7 +723,7 @@ export class GameRoom extends DurableObject {
 		return true;
 	}
 
-	private async runFiltrationIntoSetup(sourceItem: InventoryItem, setupItem: InventoryItem): Promise<boolean> {
+	private async runFiltrationIntoSetup(playerId: string, sourceItem: InventoryItem, setupItem: InventoryItem): Promise<boolean> {
 		const setupMeta = this.ensureLabMeta(setupItem);
 		if (!setupMeta.setupFilterPaperAttached || !setupMeta.setupReceiverAttached) {
 			return false;
@@ -534,7 +762,7 @@ export class GameRoom extends DurableObject {
 		sourceItem.contents = [];
 		sourceMeta.filtered = true;
 
-		await this.completeMilestone(7, "Penyaringan via setup corong + kertas saring + piala penampung berhasil");
+		await this.completeMilestone(playerId, 7, "Penyaringan via setup corong + kertas saring + piala penampung berhasil");
 		return true;
 	}
 
@@ -635,19 +863,20 @@ export class GameRoom extends DurableObject {
 		item.labMeta = undefined;
 	}
 
-	private isMilestoneDone(step: number): boolean {
-		if (!this.levelState) return false;
-		const milestone = this.levelState.milestones[step - 1];
+	private isMilestoneDone(playerId: string, step: number): boolean {
+		const state = this.levelStates.get(playerId);
+		if (!state) return false;
+		const milestone = state.milestones[step - 1];
 		return Boolean(milestone?.completed);
 	}
 
-	private async completeMilestone(step: number, detail: string): Promise<boolean> {
-		if (!this.levelState) return false;
+	private async completeMilestone(playerId: string, step: number, detail: string): Promise<boolean> {
+		const state = await this.ensurePlayerLevelState(playerId);
 		const idx = step - 1;
-		if (idx < 0 || idx >= this.levelState.milestones.length) return false;
-		const milestone = this.levelState.milestones[idx];
+		if (idx < 0 || idx >= state.milestones.length) return false;
+		const milestone = state.milestones[idx];
 		if (milestone.completed) return false;
-		if (idx > 0 && !this.levelState.milestones[idx - 1].completed) {
+		if (idx > 0 && !state.milestones[idx - 1].completed) {
 			return false;
 		}
 
@@ -655,14 +884,27 @@ export class GameRoom extends DurableObject {
 		milestone.completed = true;
 		milestone.completedAt = now;
 		milestone.detail = detail;
-		this.levelState.xp += STEP_XP[idx];
-		this.levelState.updatedAt = now;
-		this.levelState.lastEvent = `Milestone ${step} tercapai: ${milestone.title}`;
-		this.levelState.finished = this.levelState.milestones.every((m) => m.completed);
+		state.xp += STEP_XP[idx];
+		state.updatedAt = now;
+		state.lastEvent = `Milestone ${step} tercapai: ${milestone.title}`;
+		state.finished = state.milestones.every((m) => m.completed);
 
-		await this.persistState();
-		this.broadcast({ type: "level_state", level: this.levelState });
+		await this.persistPlayerLevelState(playerId);
+		this.sendTo(playerId, { type: "level_state", level: state });
 		return true;
+	}
+
+	/** Send a single server message to one player's websocket. Used for per-user
+	 *  events like level_state and level_report that should not leak to other
+	 *  players. Silently no-ops if the player is not connected. */
+	private sendTo(playerId: string, msg: ServerMessage): void {
+		const player = this.players.get(playerId);
+		if (!player) return;
+		try {
+			player.ws.send(JSON.stringify(msg));
+		} catch {
+			// player may have disconnected; ignore
+		}
 	}
 
 	private checkRateLimit(playerId: string, type: ClientMessage["type"]): boolean {
@@ -677,6 +919,7 @@ export class GameRoom extends DurableObject {
 			take_item: { max: 10, windowMs: 3000 },
 			place_item: { max: 10, windowMs: 3000 },
 			weigh_item: { max: 10, windowMs: 3000 },
+			scoop_sample: { max: 40, windowMs: 3000 },
 			pour_item: { max: 10, windowMs: 3000 },
 			dissolve_item: { max: 10, windowMs: 3000 },
 			combine_items: { max: 10, windowMs: 3000 },
@@ -730,8 +973,9 @@ export class GameRoom extends DurableObject {
 		this.ctx.acceptWebSocket(server);
 
 		const ts = ROOM_CONFIG.TILE_SIZE;
-		const spawnCenterX = Math.floor(ROOM_CONFIG.MAP_COLS / 2) * ts + ts / 2;
-		const spawnCenterY = Math.floor(ROOM_CONFIG.MAP_ROWS / 2) * ts + ts / 2;
+		// Spawn at bottom corridor of main lab: col 13, row 18.
+		const spawnCenterX = 13 * ts + ts / 2;
+		const spawnCenterY = 18 * ts + ts / 2;
 		const spawnOffsetX = (Math.random() - 0.5) * ts * 0.5;
 		const spawnOffsetY = (Math.random() - 0.5) * ts * 0.5;
 		const playerState: PlayerState = {
@@ -756,9 +1000,8 @@ export class GameRoom extends DurableObject {
 		};
 		server.send(JSON.stringify(snapshot));
 
-		if (this.levelState) {
-			server.send(JSON.stringify({ type: "level_state", level: this.levelState } satisfies ServerMessage));
-		}
+		const playerLevelState = await this.ensurePlayerLevelState(user.id);
+		server.send(JSON.stringify({ type: "level_state", level: playerLevelState } satisfies ServerMessage));
 
 		this.broadcast({ type: "player_join", player: playerState }, user.id);
 		return new Response(null, { status: 101, webSocket: client });
@@ -815,6 +1058,84 @@ export class GameRoom extends DurableObject {
 		if (!attachment) return;
 		this.players.delete(attachment.playerState.id);
 		this.broadcast({ type: "player_leave", playerId: attachment.playerState.id });
+	}
+
+	/**
+	 * Shared weighing logic used by both weigh_item (typed transfer) and
+	 * scoop_sample (random jitter). Returns true if the transfer happened.
+	 */
+	private async applyWeighTransfer(playerId: string, player: PlayerConnection, transferGrams: number): Promise<boolean> {
+		const bahanIdx = player.state.holding.findIndex(
+			(h) => h.category === "bahan" && h.weightGrams && h.weightGrams > 0,
+		);
+		const containerIdx = player.state.holding.findIndex(
+			(h) => h.category === "alat" && h.maxVolumeMl !== undefined,
+		);
+
+		if (bahanIdx === -1) {
+			this.sendError(player.ws, "Kamu harus memegang bahan padat");
+			return false;
+		}
+		if (containerIdx === -1) {
+			this.sendError(player.ws, "Kamu harus memegang wadah");
+			return false;
+		}
+
+		const bahan = player.state.holding[bahanIdx];
+		const container = player.state.holding[containerIdx];
+
+		if (transferGrams > (bahan.weightGrams ?? 0)) {
+			this.sendError(player.ws, "Berat transfer melebihi berat bahan");
+			return false;
+		}
+
+		bahan.weightGrams = this.round4((bahan.weightGrams ?? 0) - transferGrams);
+		if (!container.contents) container.contents = [];
+		const bahanKind = this.itemKind(bahan);
+		const existingContent = container.contents.find((c) => this.contentItemKind(c.itemId) === bahanKind);
+		if (existingContent && existingContent.weightGrams !== undefined) {
+			existingContent.weightGrams = this.round4(existingContent.weightGrams + transferGrams);
+		} else {
+			container.contents.push({ itemId: bahanKind, name: bahan.name, weightGrams: transferGrams });
+		}
+
+		if (this.isItemKind(bahan, "terusi")) {
+			const meta = this.ensureLabMeta(container);
+			meta.sampleTerusiG = this.round4((meta.sampleTerusiG ?? 0) + transferGrams);
+			const sample = meta.sampleTerusiG ?? 0;
+			const containerKind = this.itemKind(container);
+
+			this.logDecision(container, "weigh.sampleMassG", sample);
+			this.logDecision(container, "weigh.sampleType", "industri");
+			this.logDecision(container, "weigh.container", containerKind);
+
+			const inRange = sample >= 0.45 && sample <= 0.55;
+			if (inRange) {
+				this.clearIssue(container, "weigh.out_of_range");
+			} else {
+				this.logIssue(container, "weigh.out_of_range");
+			}
+
+			const canonicalContainer = containerKind === "kaca-arloji";
+			if (canonicalContainer) {
+				this.clearIssue(container, "weigh.non_canonical_container");
+			} else {
+				this.logIssue(container, "weigh.non_canonical_container");
+			}
+
+			const detailParts = [`Sampel terusi ditimbang ${sample}g`];
+			if (!inRange) detailParts.push("di luar rentang standar");
+			if (!canonicalContainer) detailParts.push(`ke ${container.name}`);
+			await this.completeMilestone(playerId, 1, detailParts.join(" · "));
+		}
+
+		if (bahan.weightGrams <= 0) {
+			player.state.holding.splice(bahanIdx, 1);
+		}
+
+		this.persistPlayerState(player.ws, player.state);
+		this.broadcast({ type: "player_hold", playerId: player.state.id, holding: player.state.holding });
+		return true;
 	}
 
 	private async handleClientMessage(playerId: string, player: PlayerConnection, msg: ClientMessage): Promise<void> {
@@ -973,7 +1294,7 @@ export class GameRoom extends DurableObject {
 				}
 
 				if ((destObj.objectType === "oven" || destObj.objectType === "furnace") && this.isContainer(placedItem)) {
-					await this.applyStationProcess(destObj, placedItem);
+					await this.applyStationProcess(playerId, destObj, placedItem);
 				}
 
 				player.state.holding.splice(heldIdx, 1);
@@ -984,51 +1305,31 @@ export class GameRoom extends DurableObject {
 				break;
 			}
 			case "weigh_item": {
-				const bahanIdx = player.state.holding.findIndex((h) => h.category === "bahan" && h.weightGrams && h.weightGrams > 0);
-				const containerIdx = player.state.holding.findIndex((h) => h.category === "alat" && h.maxVolumeMl !== undefined);
+				const ok = await this.applyWeighTransfer(playerId, player, msg.transferGrams);
+				if (!ok) break;
+				break;
+			}
+			case "scoop_sample": {
+				// Random transfer in 0.03-0.08 g to mimic a manual spatula scoop.
+				// Jittered slightly so display doesn't look grid-aligned.
+				const base = 0.03 + Math.random() * 0.05;
+				const jitter = (Math.random() - 0.5) * 0.004;
+				const grams = Math.max(0.001, this.round4(base + jitter));
 
+				const bahanIdx = player.state.holding.findIndex((h) => h.category === "bahan" && h.weightGrams && h.weightGrams > 0);
 				if (bahanIdx === -1) {
 					this.sendError(player.ws, "Kamu harus memegang bahan padat");
 					break;
 				}
-				if (containerIdx === -1) {
-					this.sendError(player.ws, "Kamu harus memegang wadah");
+				const available = player.state.holding[bahanIdx].weightGrams ?? 0;
+				const actual = Math.min(grams, this.round4(available));
+				if (actual <= 0) {
+					this.sendError(player.ws, "Sampel sudah habis");
 					break;
 				}
 
-				const bahan = player.state.holding[bahanIdx];
-				const container = player.state.holding[containerIdx];
-
-				if (msg.transferGrams > (bahan.weightGrams ?? 0)) {
-					this.sendError(player.ws, "Berat transfer melebihi berat bahan");
-					break;
-				}
-
-				bahan.weightGrams = this.round4((bahan.weightGrams ?? 0) - msg.transferGrams);
-				if (!container.contents) container.contents = [];
-				const bahanKind = this.itemKind(bahan);
-				const existingContent = container.contents.find((c) => this.contentItemKind(c.itemId) === bahanKind);
-				if (existingContent && existingContent.weightGrams !== undefined) {
-					existingContent.weightGrams = this.round4(existingContent.weightGrams + msg.transferGrams);
-				} else {
-					container.contents.push({ itemId: bahanKind, name: bahan.name, weightGrams: msg.transferGrams });
-				}
-
-				if (this.isItemKind(bahan, "terusi") && this.isItemKind(container, "kaca-arloji")) {
-					const meta = this.ensureLabMeta(container);
-					meta.sampleTerusiG = this.round4((meta.sampleTerusiG ?? 0) + msg.transferGrams);
-					const sample = meta.sampleTerusiG ?? 0;
-					if (sample >= 0.45 && sample <= 0.55) {
-						await this.completeMilestone(1, `Sampel terusi ditimbang ${sample}g`);
-					}
-				}
-
-				if (bahan.weightGrams <= 0) {
-					player.state.holding.splice(bahanIdx, 1);
-				}
-
-				this.persistPlayerState(player.ws, player.state);
-				this.broadcast({ type: "player_hold", playerId, holding: player.state.holding });
+				const ok = await this.applyWeighTransfer(playerId, player, actual);
+				if (!ok) break;
 				break;
 			}
 			case "pour_item": {
@@ -1075,28 +1376,98 @@ export class GameRoom extends DurableObject {
 				const targetMeta = this.ensureLabMeta(target);
 				if (this.isItemKind(source, "h2so4") && this.hasDissolvedTerusi(target)) {
 					targetMeta.acidified = true;
-					await this.completeMilestone(3, "Larutan diasamkan dengan H2SO4");
+					const cumulativeH2so4 = this.getLiquidVolume(target, "h2so4");
+					this.logDecision(target, "acidify.applied", true);
+					this.logDecision(target, "acidify.h2so4VolumeMl", cumulativeH2so4);
+
+					if (cumulativeH2so4 < 1) {
+						this.logIssue(target, "acidify.insufficient");
+					} else {
+						this.clearIssue(target, "acidify.insufficient");
+					}
+
+					await this.completeMilestone(
+						playerId,
+						3,
+						`Larutan diasamkan dengan ${cumulativeH2so4}mL H2SO4`,
+					);
 				}
 
-				if (this.isItemKind(source, "naoh") && targetMeta.boiled && this.hasDissolvedTerusi(target)) {
+				// Pengendap variants — naoh (default 4N), naoh-1n, naoh-8n, koh-4n, nh4oh-4n.
+				// Open-world: any alkaline reagent triggers precipitation logic. Student's
+				// reagent + technique choices are logged; downstream consequences manifest
+				// in applyCalcination.
+				const sourceKind = this.itemKind(source);
+				const isPengendap =
+					sourceKind === "naoh" ||
+					sourceKind === "naoh-1n" ||
+					sourceKind === "naoh-8n" ||
+					sourceKind === "koh-4n" ||
+					sourceKind === "nh4oh-4n";
+
+				if (isPengendap && this.hasDissolvedTerusi(target)) {
+					const reagentKind =
+						sourceKind === "koh-4n"
+							? "koh"
+							: sourceKind === "nh4oh-4n"
+								? "nh4oh"
+								: "naoh";
+					const normality =
+						sourceKind === "naoh-1n" ? "1N" : sourceKind === "naoh-8n" ? "8N" : "4N";
+
+					this.logDecision(target, "precipitate.reagentKind", reagentKind);
+					this.logDecision(target, "precipitate.normality", normality);
+					this.logDecision(target, "precipitate.applied", true);
+
+					// Track addition technique via this pour's volume. A single big pour
+					// (≥5mL at once) is "rapid"; many small pours means dropwise. The
+					// last observation wins — if student ever did a rapid pour, keep the
+					// flag (matches real-lab consequence permanence).
+					const rapidThisPour = transferMl >= 5;
+					const priorRapid = Boolean(targetMeta.decisions?.["precipitate.rapidAddition"]);
+					this.logDecision(target, "precipitate.rapidAddition", priorRapid || rapidThisPour);
+
+					// Issue codes — only emit if student's choice departs from the
+					// standard procedure. Always clear first so a corrective action
+					// (e.g. switching from nh4oh back to naoh is not possible mid-run,
+					// but issues per pour should reflect current pour decisively).
+					if (reagentKind === "nh4oh") {
+						this.logIssue(target, "precipitate.nh4oh_complex");
+					}
+					if (reagentKind === "koh") {
+						this.logIssue(target, "precipitate.koh_residue");
+					}
+					if (normality === "8N") {
+						this.logIssue(target, "precipitate.too_concentrated");
+					}
+					if (rapidThisPour) {
+						this.logIssue(target, "precipitate.rapid_addition");
+					}
+
+					// Physical effect: NH4OH forms soluble [Cu(NH3)4]2+ complex and
+					// no Cu(OH)2 precipitate is produced. Other alkali produce normal
+					// hydroxide precipitate; yield differences are handled at
+					// applyCalcination time.
 					targetMeta.precipitated = true;
 					const sampleMass = targetMeta.sampleTerusiG ?? this.getSolidWeight(target, "terusi");
-					if (sampleMass > 0) {
+					if (sampleMass > 0 && reagentKind !== "nh4oh") {
 						const precipMass = this.round4(sampleMass * CUOH2_FROM_TERUSI_RATIO);
-						if (precipMass > 0) this.upsertSolid(target, "endapan-cuoh2", "Endapan Cu(OH)2", precipMass, false);
+						if (precipMass > 0) {
+							this.upsertSolid(target, "endapan-cuoh2", "Endapan Cu(OH)2", precipMass, false);
+						}
 					}
 				}
 
 				if (this.isItemKind(source, "air-suling") && targetMeta.filtered && this.hasSolid(target, "endapan-cuoh2")) {
 					targetMeta.washed = true;
-					await this.completeMilestone(8, "Endapan dicuci dengan air suling");
+					await this.completeMilestone(playerId, 8, "Endapan dicuci dengan air suling");
 				}
 
 				if (this.isItemKind(target, "tabung-reaksi")) {
 					if (this.isItemKind(source, "hcl")) targetMeta.sulfateTestHclAdded = true;
 					if (this.isItemKind(source, "bacl2")) targetMeta.sulfateTestBaCl2Added = true;
 					if (targetMeta.fromFiltrate && targetMeta.sulfateTestHclAdded && targetMeta.sulfateTestBaCl2Added) {
-						await this.completeMilestone(9, "Uji sulfat selesai dengan HCl dan BaCl2");
+						await this.completeMilestone(playerId, 9, "Uji sulfat selesai dengan HCl dan BaCl2");
 					}
 				}
 
@@ -1138,12 +1509,25 @@ export class GameRoom extends DurableObject {
 					targetMeta.sampleTerusiG = sourceMeta.sampleTerusiG;
 				}
 
-				if (this.isItemKind(target, "piala-gelas")) {
-					const dissolvedTerusi = this.getSolidWeight(target, "terusi");
-					const waterVolume = this.getLiquidVolume(target, "air-suling");
-					if (dissolvedTerusi > 0 && waterVolume >= 100) {
-						await this.completeMilestone(2, "Terusi berhasil dilarutkan dalam 100mL air suling");
+				const dissolvedTerusi = this.getSolidWeight(target, "terusi");
+				const waterVolume = this.getLiquidVolume(target, "air-suling");
+				if (dissolvedTerusi > 0 && waterVolume > 0) {
+					// Open-world: accept any reasonable dissolution, log the
+					// student's volume/container choice, flag if clearly insufficient.
+					this.logDecision(target, "dissolve.waterVolumeMl", waterVolume);
+					this.logDecision(target, "dissolve.container", this.itemKind(target));
+
+					if (waterVolume < 50) {
+						this.logIssue(target, "dissolve.insufficient_water");
+					} else {
+						this.clearIssue(target, "dissolve.insufficient_water");
 					}
+
+					const detail =
+						waterVolume >= 90 && waterVolume <= 120
+							? `Terusi dilarutkan dalam ${waterVolume}mL air suling`
+							: `Terusi dilarutkan dalam ${waterVolume}mL air suling (volume di luar kisaran standar)`;
+					await this.completeMilestone(playerId, 2, detail);
 				}
 
 				await this.persistState();
@@ -1161,7 +1545,7 @@ export class GameRoom extends DurableObject {
 					break;
 				}
 
-				const handled = await this.handleCombineRecipe(obj, itemA, itemB);
+				const handled = await this.handleCombineRecipe(playerId, obj, itemA, itemB);
 				if (!handled) {
 					this.sendError(player.ws, "Kombinasi item ini belum didukung");
 					break;
@@ -1187,10 +1571,10 @@ export class GameRoom extends DurableObject {
 				const measured = this.round4(msg.measuredMassG);
 				const meta = this.ensureLabMeta(heldContainer);
 
-				if (!this.isMilestoneDone(13)) {
+				if (!this.isMilestoneDone(playerId, 13)) {
 					meta.lastRecordedMassG = measured;
 					meta.reheatedAfterWeigh = false;
-					await this.completeMilestone(13, `Bobot CuO dicatat ${measured}g`);
+					await this.completeMilestone(playerId, 13, `Bobot CuO dicatat ${measured}g`);
 				} else {
 					if (!meta.reheatedAfterWeigh) {
 						this.sendError(player.ws, "Lakukan pijar dan pendinginan lagi sebelum timbang ulang");
@@ -1201,7 +1585,10 @@ export class GameRoom extends DurableObject {
 					meta.lastRecordedMassG = measured;
 					meta.reheatedAfterWeigh = false;
 					if (diff <= 0.0004) {
-						await this.completeMilestone(14, `Bobot tetap tercapai (selisih ${diff}g)`);
+						const completed = await this.completeMilestone(playerId, 14, `Bobot tetap tercapai (selisih ${diff}g)`);
+						if (completed) {
+							this.broadcastLevelReport(playerId, heldContainer);
+						}
 					} else {
 						this.sendError(player.ws, `Bobot belum tetap (selisih ${diff}g), ulangi pijar-dingin-timbang`);
 					}
@@ -1241,7 +1628,22 @@ export class GameRoom extends DurableObject {
 					break;
 				}
 
+				// Capture restart signal before wiping labMeta: a terusi-containing
+				// container being emptied is treated as the student restarting the
+				// weighing step. Persist the count across the reset.
+				const hadTerusi = (heldContainer.contents ?? []).some(
+					(c) => this.contentItemKind(c.itemId) === "terusi" && (c.weightGrams ?? 0) > 0,
+				);
+				const prevRestartCount = hadTerusi
+					? Number(heldContainer.labMeta?.decisions?.["weigh.restartCount"] ?? 0)
+					: 0;
+
 				this.clearContainerContents(heldContainer);
+
+				if (hadTerusi) {
+					this.logDecision(heldContainer, "weigh.restartCount", prevRestartCount + 1);
+				}
+
 				this.persistPlayerState(player.ws, player.state);
 				this.broadcast({ type: "player_hold", playerId, holding: player.state.holding });
 				break;
@@ -1269,7 +1671,7 @@ export class GameRoom extends DurableObject {
 		}
 	}
 
-	private async handleCombineRecipe(obj: GameObjectState, itemA: InventoryItem, itemB: InventoryItem): Promise<boolean> {
+	private async handleCombineRecipe(playerId: string, obj: GameObjectState, itemA: InventoryItem, itemB: InventoryItem): Promise<boolean> {
 		const setupItem = this.isItemKind(itemA, "corong-stand") ? itemA : this.isItemKind(itemB, "corong-stand") ? itemB : null;
 		const setupOther = setupItem ? (setupItem === itemA ? itemB : itemA) : null;
 
@@ -1285,7 +1687,7 @@ export class GameRoom extends DurableObject {
 				const hasResidue = (setupItem.contents ?? []).some((c) => (c.weightGrams ?? 0) > 0);
 				if (setupMeta.washed && hasResidue) {
 					setupMeta.baseTested = true;
-					await this.completeMilestone(10, "Uji basa dengan lakmus pada setup penyaring selesai");
+					await this.completeMilestone(playerId, 10, "Uji basa dengan lakmus pada setup penyaring selesai");
 					return true;
 				}
 			}
@@ -1308,7 +1710,7 @@ export class GameRoom extends DurableObject {
 						]);
 						setupMeta.setupReceiverFromFiltrate = true;
 						setupMeta.washed = true;
-						await this.completeMilestone(8, "Endapan pada kertas saring dicuci dengan air suling");
+						await this.completeMilestone(playerId, 8, "Endapan pada kertas saring dicuci dengan air suling");
 						return true;
 					}
 				}
@@ -1322,7 +1724,7 @@ export class GameRoom extends DurableObject {
 					setupMeta.setupFilterPaperAttached && setupMeta.setupReceiverAttached,
 				);
 				if (setupReadyForFiltration && otherMeta.precipitated) {
-					if (await this.runFiltrationIntoSetup(setupOther, setupItem)) {
+					if (await this.runFiltrationIntoSetup(playerId, setupOther, setupItem)) {
 						return true;
 					}
 				}
@@ -1374,34 +1776,49 @@ export class GameRoom extends DurableObject {
 		if (container && toolItem) {
 			const meta = this.ensureLabMeta(container);
 
-			if (this.isItemKind(toolItem, "hot-plate") && meta.acidified) {
+			if (this.isItemKind(toolItem, "hot-plate") && this.hasDissolvedTerusi(container)) {
+				// Open-world: allow boiling regardless of acidification. Skipping
+				// H2SO4 pre-boil leaves Cu2+ susceptible to hydrolysis into
+				// Cu(OH)2 colloid before NaOH is even introduced (Post #1).
 				meta.boiled = true;
-				await this.completeMilestone(4, "Larutan dididihkan di hot plate");
+				this.logDecision(container, "boil.applied", true);
+				this.logDecision(container, "boil.preAcidified", Boolean(meta.acidified));
+
+				if (!meta.acidified) {
+					this.logIssue(container, "boil.no_acidify");
+				} else {
+					this.clearIssue(container, "boil.no_acidify");
+				}
+
+				const detail = meta.acidified
+					? "Larutan dididihkan di hot plate"
+					: "Larutan dididihkan di hot plate tanpa pengasaman H2SO4";
+				await this.completeMilestone(playerId, 4, detail);
 				return true;
 			}
 
 			if (this.isItemKind(toolItem, "pengaduk-kaca") && meta.precipitated) {
 				meta.stirred = true;
-				await this.completeMilestone(5, "Endapan dibentuk dan diaduk");
+				await this.completeMilestone(playerId, 5, "Endapan dibentuk dan diaduk");
 				return true;
 			}
 
 			if (this.isItemKind(toolItem, "kertas-lakmus")) {
 				if (meta.precipitated && meta.stirred) {
 					meta.precipitationChecked = true;
-					await this.completeMilestone(6, "Pengendapan sempurna terverifikasi");
+					await this.completeMilestone(playerId, 6, "Pengendapan sempurna terverifikasi");
 					return true;
 				}
 				if (meta.washed) {
 					meta.baseTested = true;
-					await this.completeMilestone(10, "Uji basa dengan lakmus selesai");
+					await this.completeMilestone(playerId, 10, "Uji basa dengan lakmus selesai");
 					return true;
 				}
 			}
 
 			if (this.isItemKind(toolItem, "oven-lab") && (meta.filtered || meta.washed)) {
 				meta.dried = true;
-				await this.completeMilestone(11, "Endapan dikeringkan di oven");
+				await this.completeMilestone(playerId, 11, "Endapan dikeringkan di oven");
 				return true;
 			}
 
@@ -1414,10 +1831,10 @@ export class GameRoom extends DurableObject {
 
 			if (this.isItemKind(toolItem, "desikator") && meta.calcined) {
 				meta.cooled = true;
-				if (this.isMilestoneDone(13) && meta.lastRecordedMassG !== undefined) {
+				if (this.isMilestoneDone(playerId, 13) && meta.lastRecordedMassG !== undefined) {
 					meta.reheatedAfterWeigh = true;
 				}
-				await this.completeMilestone(12, "Sampel dipijarkan lalu didinginkan di desikator");
+				await this.completeMilestone(playerId, 12, "Sampel dipijarkan lalu didinginkan di desikator");
 				return true;
 			}
 		}
@@ -1440,22 +1857,86 @@ export class GameRoom extends DurableObject {
 		return false;
 	}
 
+	/**
+	 * Catalog of deviation effects applied at calcination.
+	 * Keep this as the single source of truth — computeLevelReport reads the
+	 * same rules to fill per-issue impactMassG.
+	 *
+	 * `multiplier` scales the ideal CuO mass (compounding if multiple issues).
+	 * `additiveG` adds a fixed mass after multipliers (represents extra residue
+	 * that inflates the final weigh-out).
+	 */
+	private readonly issueImpactRules: Record<string, { multiplier?: number; additiveG?: number }> = {
+		"precipitate.nh4oh_complex": { multiplier: 0.2 },
+		"boil.no_acidify": { multiplier: 0.88 },
+		"precipitate.too_concentrated": { multiplier: 0.92 },
+		"precipitate.rapid_addition": { multiplier: 0.95 },
+		"precipitate.koh_residue": { additiveG: 0.0009 },
+	};
+
+	private applyIssueEffects(
+		baseCuoMass: number,
+		issues: string[],
+	): { finalMass: number; perIssueImpact: Record<string, number> } {
+		let multiplierProduct = 1;
+		let additive = 0;
+		const mults: Array<{ code: string; factor: number }> = [];
+		const addi: Array<{ code: string; g: number }> = [];
+
+		for (const code of issues) {
+			const rule = this.issueImpactRules[code];
+			if (!rule) continue;
+			if (rule.multiplier !== undefined) {
+				multiplierProduct *= rule.multiplier;
+				mults.push({ code, factor: rule.multiplier });
+			}
+			if (rule.additiveG !== undefined) {
+				additive += rule.additiveG;
+				addi.push({ code, g: rule.additiveG });
+			}
+		}
+
+		const finalMass = this.round4(Math.max(baseCuoMass * multiplierProduct + additive, 0));
+
+		// Attribute impact per issue. For multipliers, impact = baseCuoMass *
+		// (1 - factor) scaled by product of the other multipliers (so total
+		// impacts sum to the actual difference).
+		const perIssueImpact: Record<string, number> = {};
+		for (const { code, factor } of mults) {
+			const others = mults
+				.filter((m) => m.code !== code)
+				.reduce((p, m) => p * m.factor, 1);
+			perIssueImpact[code] = this.round4(baseCuoMass * others * (factor - 1));
+		}
+		for (const { code, g } of addi) {
+			perIssueImpact[code] = this.round4(g);
+		}
+		return { finalMass, perIssueImpact };
+	}
+
 	private applyCalcination(container: InventoryItem): void {
 		const meta = this.ensureLabMeta(container);
-		const fromSample = (meta.sampleTerusiG ?? 0) * CUO_FROM_TERUSI_RATIO;
-		const precipMass = this.getSolidWeight(container, "endapan-cuoh2");
-		const fromPrecip = precipMass * 0.8155;
-		let cuoMass = meta.cuoMassG ?? this.round4(Math.max(fromSample, fromPrecip));
-		if (meta.cuoMassG !== undefined) {
-			cuoMass = this.round4(Math.max(meta.cuoMassG - 0.0002, 0));
+		const firstCalcination = meta.cuoMassG === undefined;
+
+		if (firstCalcination) {
+			const fromSample = (meta.sampleTerusiG ?? 0) * CUO_FROM_TERUSI_RATIO;
+			const precipMass = this.getSolidWeight(container, "endapan-cuoh2");
+			const fromPrecip = precipMass * 0.8155;
+			const idealCuo = this.round4(Math.max(fromSample, fromPrecip));
+
+			const issues = meta.outcomes?.issues ?? [];
+			const { finalMass } = this.applyIssueEffects(idealCuo, issues);
+			meta.cuoMassG = finalMass;
+		} else {
+			// Reheat iteration — small equilibrium loss (matches bobot-tetap simulation).
+			meta.cuoMassG = this.round4(Math.max((meta.cuoMassG ?? 0) - 0.0002, 0));
 		}
-		meta.cuoMassG = cuoMass;
 
 		if (container.contents) {
 			container.contents = container.contents.filter((c) => this.contentItemKind(c.itemId) !== "endapan-cuoh2");
 		}
-		if (cuoMass > 0) {
-			this.upsertSolid(container, "cuo-hasil-pijar", "CuO (hasil pijar)", cuoMass, false);
+		if ((meta.cuoMassG ?? 0) > 0) {
+			this.upsertSolid(container, "cuo-hasil-pijar", "CuO (hasil pijar)", meta.cuoMassG!, false);
 		}
 	}
 
@@ -1471,12 +1952,12 @@ export class GameRoom extends DurableObject {
 		}
 	}
 
-	private async applyStationProcess(destObj: GameObjectState, item: InventoryItem): Promise<void> {
+	private async applyStationProcess(playerId: string, destObj: GameObjectState, item: InventoryItem): Promise<void> {
 		if (destObj.objectType === "oven") {
 			const meta = this.ensureLabMeta(item);
 			if (meta.filtered || meta.washed) {
 				meta.dried = true;
-				await this.completeMilestone(11, "Endapan dikeringkan di oven");
+				await this.completeMilestone(playerId, 11, "Endapan dikeringkan di oven");
 			}
 			return;
 		}

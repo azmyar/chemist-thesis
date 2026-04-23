@@ -20,6 +20,19 @@ export const containerContentSchema = z.object({
 });
 export type ContainerContent = z.infer<typeof containerContentSchema>;
 
+/**
+ * Decision value stored per container. Flexible key-value so new step handlers
+ * can log context-specific choices without schema migration.
+ */
+export const decisionValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+export type DecisionValue = z.infer<typeof decisionValueSchema>;
+
+export const containerOutcomesSchema = z.object({
+	issues: z.array(z.string()).optional(),
+	massErrorG: z.number().optional(),
+});
+export type ContainerOutcomes = z.infer<typeof containerOutcomesSchema>;
+
 export const labContainerMetaSchema = z.object({
 	sampleTerusiG: z.number().optional(),
 	acidified: z.boolean().optional(),
@@ -46,6 +59,11 @@ export const labContainerMetaSchema = z.object({
 	setupReceiverMaxVolumeMl: z.number().optional(),
 	setupReceiverContents: z.array(containerContentSchema).optional(),
 	setupReceiverFromFiltrate: z.boolean().optional(),
+
+	// Open-world tracking: student decisions + derived outcomes.
+	// Populated incrementally by step handlers; consumed by computeLevelReport.
+	decisions: z.record(z.string(), decisionValueSchema).optional(),
+	outcomes: containerOutcomesSchema.optional(),
 });
 export type LabContainerMeta = z.infer<typeof labContainerMetaSchema>;
 
@@ -110,6 +128,29 @@ export const levelStateSchema = z.object({
 	lastEvent: z.string().optional(),
 });
 export type LevelState = z.infer<typeof levelStateSchema>;
+
+// ── Level Report (final summary shown after milestone 14) ────────
+
+export const reportIssueSchema = z.object({
+	code: z.string(),
+	impactMassG: z.number(),
+	decisionSummary: z.string(),
+});
+export type ReportIssue = z.infer<typeof reportIssueSchema>;
+
+export const levelReportSchema = z.object({
+	levelId: z.string(),
+	sampleMassG: z.number(),
+	cuoMassG: z.number(),
+	gravimetricFactor: z.number(),
+	kadarPercent: z.number(),
+	theoreticalPercent: z.number(),
+	deviationPercent: z.number(),
+	issues: z.array(reportIssueSchema),
+	decisions: z.record(z.string(), decisionValueSchema),
+	generatedAt: z.number(),
+});
+export type LevelReport = z.infer<typeof levelReportSchema>;
 
 // ── Player State ──────────────────────────────────
 
@@ -189,6 +230,15 @@ export const clientWeighItemSchema = z.object({
 	transferGrams: z.number().positive(),
 });
 
+/**
+ * Tap-to-scoop weighing. Unlike weigh_item, the client specifies no amount;
+ * the server picks a small random transfer (mimics manual spatula scoop).
+ * Intended for realistic sample weighing on a balance.
+ */
+export const clientScoopSampleSchema = z.object({
+	type: z.literal("scoop_sample"),
+});
+
 export const clientPourItemSchema = z.object({
 	type: z.literal("pour_item"),
 	objectId: z.string(),
@@ -245,6 +295,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 	clientTakeItemSchema,
 	clientPlaceItemSchema,
 	clientWeighItemSchema,
+	clientScoopSampleSchema,
 	clientPourItemSchema,
 	clientDissolveItemSchema,
 	clientCombineItemsSchema,
@@ -297,18 +348,22 @@ export type ServerMessage =
 	| {
 			type: "level_state";
 			level: LevelState;
+	  }
+	| {
+			type: "level_report";
+			report: LevelReport;
 	  };
 
 // ── Room Config ───────────────────────────────────
 
 export const ROOM_CONFIG = {
 	MAX_PLAYERS: 20,
-	MAP_WIDTH: 1024,
-	MAP_HEIGHT: 768,
+	MAP_WIDTH: 896,
+	MAP_HEIGHT: 672,
 	TILE_SIZE: 32,
-	MAP_COLS: 32,
-	MAP_ROWS: 24,
-	PLAYER_SPEED: 80,
+	MAP_COLS: 28,
+	MAP_ROWS: 21,
+	PLAYER_SPEED: 120,
 } as const;
 
 // ── Join Room Schema ──────────────────────────────

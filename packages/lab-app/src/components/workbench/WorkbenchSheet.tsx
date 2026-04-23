@@ -14,6 +14,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { gameClient } from "@/lib/network/client";
 import type { HeldItem, InventoryItem } from "@/lib/protocol";
+import { PROCESS_DURATIONS, PROCESS_LABELS, slowSend } from "@/lib/slowSend";
 import {
 	canDissolve,
 	canPour,
@@ -33,7 +34,14 @@ const ITEM_EMOJI: Record<string, string> = {
 };
 
 function getItemKind(item: InventoryItem | HeldItem): string {
-	return item.baseItemId ?? item.itemId;
+	if (item.baseItemId) return item.baseItemId;
+	const sep = item.itemId.indexOf("::");
+	return sep === -1 ? item.itemId : item.itemId.slice(0, sep);
+}
+
+function kindFromItemId(itemId: string): string {
+	const sep = itemId.indexOf("::");
+	return sep === -1 ? itemId : itemId.slice(0, sep);
 }
 
 function canDiscardItemContents(item: InventoryItem | HeldItem): boolean {
@@ -342,7 +350,20 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 				return;
 			}
 
-			gameClient.send({ type: "combine_items", objectId, itemIdA: dragItemId, itemIdB: overItemId });
+			const combineMsg = {
+				type: "combine_items" as const,
+				objectId,
+				itemIdA: dragItemId,
+				itemIdB: overItemId,
+			};
+			const kinds = [kindFromItemId(dragItemId), kindFromItemId(overItemId)];
+			if (kinds.includes("hot-plate")) {
+				slowSend(combineMsg, PROCESS_LABELS.hotPlate, PROCESS_DURATIONS.hotPlate);
+			} else if (kinds.includes("desikator")) {
+				slowSend(combineMsg, PROCESS_LABELS.desikator, PROCESS_DURATIONS.desikator);
+			} else {
+				gameClient.send(combineMsg);
+			}
 		}
 	}, [holding, items, objectId]);
 
@@ -386,7 +407,10 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 
 			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
 				<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ touchAction: "none" }}>
-					<div className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex flex-col" style={{ height: "70vh" }}>
+					<div
+						className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex flex-col"
+						style={{ height: "min(70dvh, 640px)", maxHeight: "calc(100dvh - 2rem)" }}
+					>
 						{/* Handle */}
 						<div className="flex justify-center pt-3 pb-1 shrink-0">
 							<div className="w-12 h-1.5 rounded-full bg-neutral-300 cursor-pointer" onClick={onClose} />

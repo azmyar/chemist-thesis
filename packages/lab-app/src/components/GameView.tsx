@@ -6,6 +6,8 @@ import { ChatOverlay } from "./ChatOverlay";
 import { InteractButton } from "./InteractButton";
 import { LevelOverlay } from "./LevelOverlay";
 import { ObjectSheet } from "./ObjectSheet";
+import { ProcessProgress } from "./ProcessProgress";
+import { ReportPanel } from "./ReportPanel";
 import { VirtualJoystick } from "./VirtualJoystick";
 import { gameClient } from "@/lib/network/client";
 
@@ -53,12 +55,14 @@ export default function GameView({ roomId, playerName }: GameViewProps) {
 	}, [roomId, playerName]);
 
 	return (
-		<div className="relative w-screen h-screen overflow-hidden">
+		<div className="relative w-screen h-[100dvh] overflow-hidden">
 			<GameCanvas roomId={roomId} />
 
 			{connected && <LevelOverlay />}
 			{connected && <ChatOverlay />}
 			{connected && <ObjectSheet />}
+			{connected && <ReportPanel />}
+			{connected && <ProcessProgress />}
 
 			{/* Connection overlays */}
 			{!connected && connecting && (

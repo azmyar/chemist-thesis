@@ -239,6 +239,45 @@ export class BootScene extends Phaser.Scene {
 		benchCtx.fillRect(0, 19, 32, 1);
 		bench.refresh();
 
+		// Meja tengah (center island) — 32×32 dark-wood cosmetic table.
+		// Distinct from the white workbench sprite so students can tell
+		// it's non-interactable bench space.
+		const mt = this.textures.createCanvas("meja-tengah", 32, 32)!;
+		const mtCtx = mt.context;
+		// Dark wood table top
+		mtCtx.fillStyle = "#5c4a32";
+		mtCtx.fillRect(0, 4, 32, 16);
+		// Upper plank highlight
+		mtCtx.fillStyle = "#7a6244";
+		mtCtx.fillRect(1, 4, 30, 4);
+		// Grain detail
+		mtCtx.fillStyle = "#8b7355";
+		mtCtx.fillRect(2, 5, 28, 1);
+		mtCtx.fillRect(4, 10, 24, 1);
+		// Top border shadow
+		mtCtx.fillStyle = "#3d2e1c";
+		mtCtx.fillRect(0, 3, 32, 1);
+		mtCtx.fillRect(0, 19, 32, 1);
+		// Side edges
+		mtCtx.fillStyle = "#4a3a25";
+		mtCtx.fillRect(0, 4, 1, 16);
+		mtCtx.fillRect(31, 4, 1, 16);
+		// Legs — darker than workbench so silhouette differs
+		mtCtx.fillStyle = "#3d2e1c";
+		mtCtx.fillRect(2, 20, 3, 12);
+		mtCtx.fillRect(27, 20, 3, 12);
+		mtCtx.fillStyle = "#4a3a25";
+		mtCtx.fillRect(3, 20, 1, 11);
+		mtCtx.fillRect(28, 20, 1, 11);
+		// Cosmetic glassware blotches on top (suggests stored items)
+		mtCtx.fillStyle = "#a5d8ff";
+		mtCtx.fillRect(6, 1, 3, 3);
+		mtCtx.fillStyle = "#ffd43b";
+		mtCtx.fillRect(14, 2, 2, 2);
+		mtCtx.fillStyle = "#69db7c";
+		mtCtx.fillRect(22, 1, 3, 3);
+		mt.refresh();
+
 		// Storage cabinet — 32×32 clean white
 		const stor = this.textures.createCanvas("storage", 32, 32)!;
 		const sCtx = stor.context;

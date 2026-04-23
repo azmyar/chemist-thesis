@@ -38,7 +38,8 @@ export function InteractButton() {
 	return (
 		<button
 			onTouchStart={handleTap}
-			className="fixed bottom-8 right-8 z-20 w-16 h-16 rounded-full bg-amber-400/90 active:bg-amber-500 border-2 border-amber-300 shadow-lg flex flex-col items-center justify-center gap-0.5 touch-manipulation"
+			className="fixed bottom-6 right-6 z-30 w-16 h-16 rounded-full bg-amber-400/90 active:bg-amber-500 border-2 border-amber-300 shadow-lg flex flex-col items-center justify-center gap-0.5 touch-manipulation"
+			style={{ bottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))" }}
 		>
 			<span className="text-[10px] font-semibold text-amber-900 leading-none">
 				{OBJECT_LABELS[nearby.objectType]}
