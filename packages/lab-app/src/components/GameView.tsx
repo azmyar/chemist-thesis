@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { GameCanvas } from "./GameCanvas";
 import { ChatOverlay } from "./ChatOverlay";
 import { ConceptFeedbackModal } from "./ConceptFeedbackModal";
+import { GuidedConceptCheckModal } from "./GuidedConceptCheckModal";
 import { InteractButton } from "./InteractButton";
 import { LevelOverlay } from "./LevelOverlay";
 import { ObjectSheet } from "./ObjectSheet";
@@ -64,6 +65,7 @@ export default function GameView({ roomId, playerName }: GameViewProps) {
 			{connected && <ObjectSheet />}
 			{connected && <ReportPanel />}
 			{connected && <ConceptFeedbackModal />}
+			{connected && <GuidedConceptCheckModal />}
 			{connected && <ProcessProgress />}
 
 			{/* Connection overlays */}
