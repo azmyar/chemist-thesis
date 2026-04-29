@@ -4,12 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
 	DndContext,
+	DragOverlay,
 	PointerSensor,
 	useDraggable,
 	useDroppable,
 	useSensor,
 	useSensors,
 	type DragEndEvent,
+	type DragStartEvent,
+	type Modifier,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { gameClient } from "@/lib/network/client";
@@ -71,6 +74,19 @@ function getItemKind(item: InventoryItem | HeldItem): string {
 	return item.baseItemId ?? contentKind(item.itemId);
 }
 
+const centerDragOverlay: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+	if (!(activatorEvent instanceof PointerEvent) || !draggingNodeRect) return transform;
+
+	const offsetX = activatorEvent.clientX - draggingNodeRect.left;
+	const offsetY = activatorEvent.clientY - draggingNodeRect.top;
+
+	return {
+		...transform,
+		x: transform.x + offsetX - draggingNodeRect.width / 2,
+		y: transform.y + offsetY - draggingNodeRect.height / 2,
+	};
+};
+
 function formatMeasurement(item: InventoryItem | HeldItem): string {
 	const parts: string[] = [];
 	if (item.weightGrams !== undefined && item.weightGrams > 0)
@@ -102,16 +118,13 @@ function DraggableObjectCard({
 }) {
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id,
-		data: { itemId: item.itemId, source: variant },
+		data: { item, itemId: item.itemId, source: variant },
 	});
-	const kind = getItemKind(item);
 	const style = {
-		transform: CSS.Translate.toString(transform),
+		transform: isDragging ? undefined : CSS.Translate.toString(transform),
 		zIndex: isDragging ? 999 : undefined,
-		opacity: isDragging ? 0.85 : 1,
+		opacity: isDragging ? 0.35 : 1,
 	};
-	const size = variant === "object" ? "w-[128px] h-[120px]" : "w-[112px] h-[96px]";
-	const tone = variant === "object" ? "border-neutral-200 text-neutral-700" : "border-amber-200 text-amber-800";
 
 	return (
 		<div
@@ -119,7 +132,29 @@ function DraggableObjectCard({
 			style={style}
 			{...listeners}
 			{...attributes}
-			className={`relative flex flex-col items-center justify-center rounded-xl border bg-white shadow-sm select-none touch-none ${size} ${tone} ${isDragging ? "shadow-lg ring-2 ring-blue-400" : "cursor-grab active:cursor-grabbing"}`}
+			className={isDragging ? "" : "cursor-grab active:cursor-grabbing"}
+		>
+			<ObjectCardBody item={item} variant={variant} isDragging={isDragging} />
+		</div>
+	);
+}
+
+function ObjectCardBody({
+	item,
+	variant,
+	isDragging = false,
+}: {
+	item: InventoryItem | HeldItem;
+	variant: "object" | "hand";
+	isDragging?: boolean;
+}) {
+	const kind = getItemKind(item);
+	const size = variant === "object" ? "w-[128px] h-[120px]" : "w-[112px] h-[96px]";
+	const tone = variant === "object" ? "border-neutral-200 text-neutral-700" : "border-amber-200 text-amber-800";
+
+	return (
+		<div
+			className={`relative flex flex-col items-center justify-center rounded-xl border bg-white shadow-sm select-none touch-none ${size} ${tone} ${isDragging ? "shadow-lg ring-2 ring-blue-400" : ""}`}
 		>
 			{"quantity" in item && item.quantity > 1 && (
 				<span className="absolute right-1 top-1 rounded bg-neutral-100 px-1 py-0.5 text-[9px] font-semibold text-neutral-500">
@@ -165,6 +200,10 @@ export function ObjectSheet() {
 	const [holding, setHolding] = useState<HeldItem[]>([]);
 	const [weighGrams, setWeighGrams] = useState("");
 	const [recordMassG, setRecordMassG] = useState("");
+	const [activeDrag, setActiveDrag] = useState<{
+		item: InventoryItem | HeldItem;
+		variant: "object" | "hand";
+	} | null>(null);
 	const weighInputRef = useRef<HTMLInputElement>(null);
 	const pointerSensor = useSensor(PointerSensor, {
 		activationConstraint: { distance: 6 },
@@ -227,8 +266,16 @@ export function ObjectSheet() {
 		[objectId, objectType],
 	);
 
+	const handleDragStart = useCallback((event: DragStartEvent) => {
+		const item = event.active.data.current?.item as InventoryItem | HeldItem | undefined;
+		const source = event.active.data.current?.source as "object" | "hand" | undefined;
+		if (!item || !source) return;
+		setActiveDrag({ item, variant: source });
+	}, []);
+
 	const handleDragEnd = useCallback(
 		(event: DragEndEvent) => {
+			setActiveDrag(null);
 			const activeItemId = event.active.data.current?.itemId as string | undefined;
 			const source = event.active.data.current?.source as "object" | "hand" | undefined;
 			const overId = event.over ? String(event.over.id) : "";
@@ -352,7 +399,12 @@ export function ObjectSheet() {
 							{objectType ? OBJECT_DESC[objectType] : ""}
 						</p>
 
-						<DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+						<DndContext
+							sensors={sensors}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDragCancel={() => setActiveDrag(null)}
+						>
 							<DroppablePanel
 								id="drop-object"
 								className="mb-4 min-h-[180px] rounded-2xl border-2 border-dashed border-neutral-200 bg-neutral-50 p-3 transition-all"
@@ -554,6 +606,15 @@ export function ObjectSheet() {
 									)}
 								</div>
 							</DroppablePanel>
+							<DragOverlay adjustScale={false} dropAnimation={null} modifiers={[centerDragOverlay]}>
+								{activeDrag ? (
+									<ObjectCardBody
+										item={activeDrag.item}
+										variant={activeDrag.variant}
+										isDragging
+									/>
+								) : null}
+							</DragOverlay>
 						</DndContext>
 					</div>
 				</div>
