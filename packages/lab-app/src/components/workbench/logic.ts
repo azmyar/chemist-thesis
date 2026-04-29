@@ -52,6 +52,5 @@ export function canDissolve(source: InventoryItem | undefined, target: Inventory
 	if (source.category !== "alat" || target.category !== "alat") return false;
 	const sourceHasSolid = (source.contents ?? []).some((c) => (c.weightGrams ?? 0) > 0);
 	if (!sourceHasSolid) return false;
-	const targetHasLiquid = (target.contents ?? []).some((c) => (c.volumeMl ?? 0) > 0);
-	return targetHasLiquid;
+	return target.maxVolumeMl !== undefined;
 }

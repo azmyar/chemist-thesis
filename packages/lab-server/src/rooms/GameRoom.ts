@@ -709,6 +709,44 @@ export class GameRoom extends DurableObject {
 		);
 	}
 
+	private markTerusiDissolvedIfReady(item: ContainerLike): boolean {
+		const waterVolume = this.getLiquidVolume(item, "air-suling");
+		if (waterVolume <= 0) return false;
+
+		let changed = false;
+		for (const content of item.contents ?? []) {
+			if (
+				this.contentItemKind(content.itemId) === "terusi" &&
+				(content.weightGrams ?? 0) > 0 &&
+				!content.dissolved
+			) {
+				content.dissolved = true;
+				changed = true;
+			}
+		}
+		return changed;
+	}
+
+	private async completeDissolutionIfReady(playerId: string, container: ContainerLike): Promise<void> {
+		if (!this.isItemKind(container, "piala-gelas")) return;
+		this.markTerusiDissolvedIfReady(container);
+
+		const dissolvedTerusi = this.getSolidWeight(container, "terusi");
+		const waterVolume = this.getLiquidVolume(container, "air-suling");
+		if (dissolvedTerusi <= 0 || waterVolume <= 0) return;
+
+		this.logDecision(container, "dissolve.waterVolumeMl", waterVolume);
+		this.logDecision(container, "dissolve.container", this.itemKind(container));
+
+		if (waterVolume < 90 || waterVolume > 120) {
+			this.sendConceptFeedback(playerId, "dissolve.water_volume");
+			return;
+		}
+
+		this.clearIssue(container, "dissolve.insufficient_water");
+		await this.completeMilestone(playerId, 2, `Terusi dilarutkan dalam ${waterVolume}mL air suling`);
+	}
+
 	private upsertLiquid(item: ContainerLike, itemId: string, name: string, volumeMl: number): void {
 		const contents = this.ensureContents(item);
 		const normalizedItemId = this.contentItemKind(itemId);
@@ -1586,6 +1624,9 @@ export class GameRoom extends DurableObject {
 				source.volumeMl = this.round4(source.volumeMl - transferMl);
 				if (source.volumeMl <= 0.0001) source.volumeMl = 0;
 				this.upsertLiquid(target, source.itemId, source.name, transferMl);
+				if (sourceKind === "air-suling") {
+					await this.completeDissolutionIfReady(playerId, target);
+				}
 
 				if (this.isItemKind(source, "h2so4") && this.hasDissolvedTerusi(target)) {
 					targetMeta.acidified = true;
@@ -1700,12 +1741,6 @@ export class GameRoom extends DurableObject {
 					break;
 				}
 
-				const hasLiquidInTarget = (target.contents ?? []).some((c) => (c.volumeMl ?? 0) > 0);
-				if (!hasLiquidInTarget) {
-					this.sendError(player.ws, "Wadah target harus berisi larutan");
-					break;
-				}
-
 				const dissolvingTerusi = sourceSolids.some((c) => this.contentItemKind(c.itemId) === "terusi");
 				if (dissolvingTerusi) {
 					const sourceMeta = this.ensureLabMeta(source);
@@ -1718,11 +1753,6 @@ export class GameRoom extends DurableObject {
 						this.blockWithConcept(playerId, "dissolve.wrong_container");
 						break;
 					}
-					const waterVolumeBeforeDissolve = this.getLiquidVolume(target, "air-suling");
-					if (waterVolumeBeforeDissolve < 90 || waterVolumeBeforeDissolve > 120) {
-						this.blockWithConcept(playerId, "dissolve.water_volume");
-						break;
-					}
 				}
 
 				this.applyDissolve(source, target, sourceSolids);
@@ -1732,26 +1762,7 @@ export class GameRoom extends DurableObject {
 					targetMeta.sampleTerusiG = sourceMeta.sampleTerusiG;
 				}
 
-				const dissolvedTerusi = this.getSolidWeight(target, "terusi");
-				const waterVolume = this.getLiquidVolume(target, "air-suling");
-				if (dissolvedTerusi > 0 && waterVolume > 0) {
-					// Open-world: accept any reasonable dissolution, log the
-					// student's volume/container choice, flag if clearly insufficient.
-					this.logDecision(target, "dissolve.waterVolumeMl", waterVolume);
-					this.logDecision(target, "dissolve.container", this.itemKind(target));
-
-					if (waterVolume < 50) {
-						this.logIssue(target, "dissolve.insufficient_water");
-					} else {
-						this.clearIssue(target, "dissolve.insufficient_water");
-					}
-
-					const detail =
-						waterVolume >= 90 && waterVolume <= 120
-							? `Terusi dilarutkan dalam ${waterVolume}mL air suling`
-							: `Terusi dilarutkan dalam ${waterVolume}mL air suling (volume di luar kisaran standar)`;
-					await this.completeMilestone(playerId, 2, detail);
-				}
+				await this.completeDissolutionIfReady(playerId, target);
 
 				await this.persistState();
 				this.broadcast({ type: "object_items_changed", objectId: msg.objectId, items: obj.items });
@@ -2068,15 +2079,21 @@ export class GameRoom extends DurableObject {
 
 		if (containerA && containerB) {
 			const solidsA = (containerA.contents ?? []).filter((c) => (c.weightGrams ?? 0) > 0);
-			const hasLiquidB = (containerB.contents ?? []).some((c) => (c.volumeMl ?? 0) > 0);
-			if (solidsA.length > 0 && hasLiquidB) {
+			if (solidsA.length > 0) {
 				this.applyDissolve(containerA, containerB, solidsA);
+				if (containerA.labMeta?.sampleTerusiG !== undefined) {
+					this.ensureLabMeta(containerB).sampleTerusiG = containerA.labMeta.sampleTerusiG;
+				}
+				await this.completeDissolutionIfReady(playerId, containerB);
 				return true;
 			}
 			const solidsB = (containerB.contents ?? []).filter((c) => (c.weightGrams ?? 0) > 0);
-			const hasLiquidA = (containerA.contents ?? []).some((c) => (c.volumeMl ?? 0) > 0);
-			if (solidsB.length > 0 && hasLiquidA) {
+			if (solidsB.length > 0) {
 				this.applyDissolve(containerB, containerA, solidsB);
+				if (containerB.labMeta?.sampleTerusiG !== undefined) {
+					this.ensureLabMeta(containerA).sampleTerusiG = containerB.labMeta.sampleTerusiG;
+				}
+				await this.completeDissolutionIfReady(playerId, containerA);
 				return true;
 			}
 		}
@@ -2168,10 +2185,11 @@ export class GameRoom extends DurableObject {
 	}
 
 	private applyDissolve(source: InventoryItem, target: InventoryItem, sourceSolids: ContainerContent[]): void {
+		const targetHasWater = this.getLiquidVolume(target, "air-suling") > 0;
 		for (const solid of sourceSolids) {
 			const grams = solid.weightGrams ?? 0;
 			if (grams <= 0) continue;
-			this.upsertSolid(target, solid.itemId, solid.name, grams, true);
+			this.upsertSolid(target, solid.itemId, solid.name, grams, targetHasWater);
 		}
 
 		if (source.contents) {
