@@ -11,7 +11,8 @@ import { ROOM_CONFIG } from "@/lib/protocol";
 import type { UIScene } from "./UIScene";
 
 /** Camera zoom — sprites are 1:1 native, camera magnifies everything like Gather.town */
-const CAMERA_ZOOM = 3;
+const DESKTOP_CAMERA_ZOOM = 3;
+const MOBILE_CAMERA_ZOOM = 2.35;
 const PLAYER_SPEED = ROOM_CONFIG.PLAYER_SPEED;
 
 interface ChatBubble {
@@ -61,6 +62,7 @@ export class LabScene extends Phaser.Scene {
 
 	// Collision grid: true = blocked tile
 	private blocked!: boolean[][];
+	private cameraZoom = DESKTOP_CAMERA_ZOOM;
 
 	// Interactable objects
 	private interactables: {
@@ -82,6 +84,7 @@ export class LabScene extends Phaser.Scene {
 	}
 
 	create() {
+		this.cameraZoom = this.getResponsiveCameraZoom();
 		this.buildGravimetriLab();
 		this.createLocalPlayer();
 		this.setupInput();
@@ -93,6 +96,20 @@ export class LabScene extends Phaser.Scene {
 		this.handleInput(delta);
 		this.interpolateRemotePlayers(delta);
 		this.checkProximity();
+	}
+
+	private getResponsiveCameraZoom() {
+		if (typeof window === "undefined") return DESKTOP_CAMERA_ZOOM;
+
+		const isCoarsePointer =
+			window.matchMedia?.("(pointer: coarse)").matches ?? false;
+		const isCompactViewport =
+			window.matchMedia?.("(max-width: 700px), (max-height: 600px)").matches ??
+			false;
+
+		return isCoarsePointer || isCompactViewport
+			? MOBILE_CAMERA_ZOOM
+			: DESKTOP_CAMERA_ZOOM;
 	}
 
 	// ── Map ───────────────────────────────────────
@@ -117,7 +134,7 @@ export class LabScene extends Phaser.Scene {
 
 		const tileX = (col: number) => col * TILE_SIZE + TILE_SIZE / 2;
 		const tileY = (row: number) => row * TILE_SIZE + TILE_SIZE / 2;
-		const invScale = 1 / CAMERA_ZOOM;
+		const invScale = 1 / this.cameraZoom;
 
 		const isInBounds = (col: number, row: number) =>
 			col >= 0 && col < MAP_COLS && row >= 0 && row < MAP_ROWS;
@@ -469,7 +486,7 @@ export class LabScene extends Phaser.Scene {
 
 		this.localPlayer.play("player-idle-down");
 
-		const invScale = 1 / CAMERA_ZOOM;
+		const invScale = 1 / this.cameraZoom;
 		this.nameTag = this.add
 			.text(centerX, centerY - 20, "Kamu", {
 				fontSize: "14px",
@@ -493,7 +510,7 @@ export class LabScene extends Phaser.Scene {
 			.setDepth(11)
 			.setVisible(false);
 
-		this.cameras.main.setZoom(CAMERA_ZOOM);
+		this.cameras.main.setZoom(this.cameraZoom);
 		this.cameras.main.startFollow(this.localPlayer, true, 0.08, 0.08);
 		this.cameras.main.setBounds(
 			0,
@@ -813,7 +830,7 @@ export class LabScene extends Phaser.Scene {
 
 		const x = state.x;
 		const y = state.y;
-		const invScale = 1 / CAMERA_ZOOM;
+		const invScale = 1 / this.cameraZoom;
 
 		const sprite = this.add
 			.sprite(x, y, "remote-player", 0)
@@ -919,7 +936,7 @@ export class LabScene extends Phaser.Scene {
 			this.localChatBubble.text.destroy();
 		}
 
-		const invScale = 1 / CAMERA_ZOOM;
+		const invScale = 1 / this.cameraZoom;
 		const bubble = this.add
 			.text(this.localPlayer.x, this.localPlayer.y - 28, text, {
 				fontSize: "12px",
@@ -947,7 +964,7 @@ export class LabScene extends Phaser.Scene {
 			remote.chatBubble.text.destroy();
 		}
 
-		const invScale = 1 / CAMERA_ZOOM;
+		const invScale = 1 / this.cameraZoom;
 		const bubble = this.add
 			.text(remote.sprite.x, remote.sprite.y - 28, text, {
 				fontSize: "12px",

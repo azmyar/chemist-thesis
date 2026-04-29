@@ -69,7 +69,7 @@ body {
 		width: 100%;
 		padding-top: 0.25rem;
 		padding-bottom: 0.25rem;
-		font-size: 0.75rem;
+		font-size: 1rem;
 	}
 
 	.chat-overlay-input::placeholder {

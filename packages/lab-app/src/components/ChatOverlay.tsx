@@ -53,7 +53,7 @@ export function ChatOverlay() {
 				}}
 				placeholder="Tekan Enter untuk chat..."
 				maxLength={200}
-				className="chat-overlay-input w-64 max-[640px]:w-full max-[640px]:placeholder:text-xs max-[640px]:text-xs max-[640px]:py-1 px-3 py-1.5 rounded-lg bg-black/60 border border-neutral-600 text-sm text-neutral-100 placeholder-neutral-500 outline-none focus:border-cyan-500 transition-colors"
+				className="chat-overlay-input w-64 max-[640px]:w-full max-[640px]:placeholder:text-xs max-[640px]:py-1 px-3 py-1.5 rounded-lg bg-black/60 border border-neutral-600 text-base text-neutral-100 placeholder-neutral-500 outline-none focus:border-cyan-500 transition-colors"
 			/>
 			<button
 				onMouseDown={(e) => e.preventDefault()}
