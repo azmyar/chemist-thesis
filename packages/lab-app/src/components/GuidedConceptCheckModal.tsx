@@ -116,12 +116,12 @@ export function GuidedConceptCheckModal() {
 	return (
 		<div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4">
 			<div
-				className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+				className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby="guided-check-title"
 			>
-				<div className="border-b border-blue-100 bg-blue-50 px-5 py-4">
+				<div className="shrink-0 border-b border-blue-100 bg-blue-50 px-5 py-4">
 					<p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
 						Cek Pemahaman Step {active.step}
 					</p>
@@ -130,7 +130,7 @@ export function GuidedConceptCheckModal() {
 					</h2>
 				</div>
 
-				<div className="px-5 py-4">
+				<div className="overflow-y-auto px-5 py-4">
 					<p className="text-sm font-medium leading-relaxed text-neutral-800">{active.question}</p>
 
 					<div className="mt-4 space-y-2">
@@ -182,7 +182,7 @@ export function GuidedConceptCheckModal() {
 					)}
 				</div>
 
-				<div className="flex justify-end gap-2 border-t border-neutral-100 px-5 py-3">
+				<div className="flex shrink-0 justify-end gap-2 border-t border-neutral-100 px-5 py-3">
 					{feedbackState === "correct" ? (
 						<button
 							type="button"

@@ -20,12 +20,12 @@ export function ConceptFeedbackModal() {
 	return (
 		<div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4">
 			<div
-				className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+				className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby="concept-feedback-title"
 			>
-				<div className="border-b border-amber-100 bg-amber-50 px-5 py-4">
+				<div className="shrink-0 border-b border-amber-100 bg-amber-50 px-5 py-4">
 					<p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
 						Pembetulan Konsep
 					</p>
@@ -34,7 +34,7 @@ export function ConceptFeedbackModal() {
 					</h2>
 				</div>
 
-				<div className="space-y-4 px-5 py-4">
+				<div className="space-y-4 overflow-y-auto px-5 py-4">
 					<section>
 						<h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
 							Mengapa belum bisa lanjut
@@ -54,7 +54,7 @@ export function ConceptFeedbackModal() {
 					</p>
 				</div>
 
-				<div className="flex justify-end border-t border-neutral-100 px-5 py-3">
+				<div className="flex shrink-0 justify-end border-t border-neutral-100 px-5 py-3">
 					<button
 						type="button"
 						onClick={() => setFeedback(null)}

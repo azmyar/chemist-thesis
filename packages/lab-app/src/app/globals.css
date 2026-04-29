@@ -57,6 +57,53 @@ body {
 	z-index: 12;
 }
 
+@media (max-height: 600px) {
+	.chat-overlay {
+		top: 0.75rem;
+		bottom: auto;
+		left: 0.75rem;
+		width: min(200px, 48vw);
+	}
+
+	.chat-overlay-input {
+		width: 100%;
+		padding-top: 0.25rem;
+		padding-bottom: 0.25rem;
+		font-size: 0.75rem;
+	}
+
+	.chat-overlay-input::placeholder {
+		font-size: 0.75rem;
+	}
+
+	.chat-overlay-button {
+		padding: 0.25rem 0.5rem;
+		font-size: 0.75rem;
+	}
+
+	.workbench-sheet {
+		height: calc(100dvh - 1rem) !important;
+		max-height: calc(100dvh - 1rem) !important;
+		border-top-left-radius: 1rem;
+		border-top-right-radius: 1rem;
+	}
+
+	.workbench-workspace {
+		min-height: 96px;
+	}
+
+	.workbench-disposal {
+		padding-top: 0.35rem;
+		padding-bottom: 0.35rem;
+	}
+
+	.workbench-hand {
+		min-height: 66px;
+		margin-bottom: 0.5rem;
+		padding: 0.5rem;
+	}
+}
+
 /* Bottom sheet slide-up */
 @keyframes slide-up {
 	from {
