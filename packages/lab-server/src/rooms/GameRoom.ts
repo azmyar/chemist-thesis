@@ -431,14 +431,18 @@ export class GameRoom extends DurableObject {
 		if (!storage) return false;
 
 		const required: InventoryItem[] = [
+			{ itemId: "hot-plate", name: "Teklu", category: "alat", quantity: 1 },
 			{ itemId: "meker", name: "Meker", category: "alat", quantity: 1 },
 		];
 
 		let changed = false;
 		for (const item of required) {
-			const exists = storage.items.some((i) => this.itemKind(i) === item.itemId);
-			if (!exists) {
+			const existing = storage.items.find((i) => this.itemKind(i) === item.itemId);
+			if (!existing) {
 				storage.items.push(item);
+				changed = true;
+			} else if (existing.quantity < item.quantity) {
+				existing.quantity = item.quantity;
 				changed = true;
 			}
 		}
