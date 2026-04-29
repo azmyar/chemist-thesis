@@ -292,6 +292,10 @@ export class GameRoom extends DurableObject {
 			shouldPersist = true;
 		}
 
+		if (this.ensureStorageTools()) {
+			shouldPersist = true;
+		}
+
 		// Migration: append reagent variants introduced in later versions to
 		// existing rooms so persisted state doesn't lock students to an old
 		// reagent set.
@@ -392,6 +396,7 @@ export class GameRoom extends DurableObject {
 				{ itemId: "piala-gelas", name: "Piala Gelas", category: "alat", quantity: 2, maxVolumeMl: 250, contents: [] },
 				{ itemId: "pengaduk-kaca", name: "Pengaduk Kaca", category: "alat", quantity: 1 },
 				{ itemId: "hot-plate", name: "Teklu", category: "alat", quantity: 1 },
+				{ itemId: "meker", name: "Meker", category: "alat", quantity: 1 },
 				{ itemId: "corong-stand", name: "Corong + Stand", category: "alat", quantity: 1 },
 				{ itemId: "kertas-saring", name: "Kertas Saring Whatman", category: "alat", quantity: 3, maxVolumeMl: 20, contents: [] },
 				{ itemId: "erlenmeyer", name: "Erlenmeyer", category: "alat", quantity: 1, maxVolumeMl: 250, contents: [] },
@@ -419,6 +424,25 @@ export class GameRoom extends DurableObject {
 				{ itemId: "hcl", name: "HCl 4N", category: "bahan", quantity: 1, volumeMl: 50 },
 			],
 		});
+	}
+
+	private ensureStorageTools(): boolean {
+		const storage = this.objects.get("storage-1");
+		if (!storage) return false;
+
+		const required: InventoryItem[] = [
+			{ itemId: "meker", name: "Meker", category: "alat", quantity: 1 },
+		];
+
+		let changed = false;
+		for (const item of required) {
+			const exists = storage.items.some((i) => this.itemKind(i) === item.itemId);
+			if (!exists) {
+				storage.items.push(item);
+				changed = true;
+			}
+		}
+		return changed;
 	}
 
 	/**
@@ -454,6 +478,10 @@ export class GameRoom extends DurableObject {
 			for (const item of obj.items) {
 				if (this.itemKind(item) === "hot-plate" && item.name !== "Teklu") {
 					item.name = "Teklu";
+					changed = true;
+				}
+				if (this.itemKind(item) === "meker" && item.name !== "Meker") {
+					item.name = "Meker";
 					changed = true;
 				}
 				if (this.itemKind(item) === "krus-porselen" && item.name !== "Cawan Porselen") {
@@ -2320,7 +2348,7 @@ export class GameRoom extends DurableObject {
 				return true;
 			}
 
-			if (this.isItemKind(toolItem, "furnace-lab") && (meta.filtered || meta.washed || meta.dried || meta.calcined || meta.cooled)) {
+			if ((this.isItemKind(toolItem, "meker") || this.isItemKind(toolItem, "furnace-lab")) && (meta.filtered || meta.washed || meta.dried || meta.calcined || meta.cooled)) {
 				if (!this.isItemKind(container, "krus-porselen") || !meta.dried || !meta.transferredToCrucible || !meta.tekluCharred) {
 					this.blockWithConcept(playerId, "furnace.before_dry");
 					return true;

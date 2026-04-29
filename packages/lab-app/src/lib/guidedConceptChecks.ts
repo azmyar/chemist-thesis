@@ -138,7 +138,7 @@ export const GUIDED_CONCEPT_CHECKS: GuidedConceptCheck[] = [
 		options: [
 			{ id: "a", text: "Filtrat atau cairan cucian, karena itu menunjukkan apakah sisa basa masih terbawa dari endapan." },
 			{ id: "b", text: "Kaca arloji kosong, karena kaca arloji akan menyerap basa." },
-			{ id: "c", text: "CuO hasil pijar, karena lakmus dipakai setelah furnace." },
+			{ id: "c", text: "CuO hasil pijar, karena lakmus dipakai setelah pemijaran." },
 		],
 		correctOptionId: "a",
 		explanation: "Uji basa dilakukan pada filtrat/cairan cucian. Jika filtrat masih basa, pencucian belum cukup dan residu basa dapat mengganggu massa akhir.",

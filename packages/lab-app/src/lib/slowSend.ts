@@ -27,12 +27,14 @@ export const PROCESS_DURATIONS = {
 	oven: 5000,
 	furnace: 7000,
 	hotPlate: 4000,
+	meker: 6000,
 	desikator: 3500,
 } as const;
 
 export const PROCESS_LABELS = {
 	oven: "Mengeringkan endapan di oven…",
-	furnace: "Memijarkan residu di meker…",
+	furnace: "Memijarkan residu di tanur…",
 	hotPlate: "Memanaskan larutan di teklu…",
+	meker: "Memijarkan residu dengan meker…",
 	desikator: "Mendinginkan di desikator…",
 } as const;
