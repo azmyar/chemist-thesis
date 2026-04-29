@@ -9,7 +9,9 @@ import {
 	useSensor,
 	useSensors,
 	closestCenter,
+	pointerWithin,
 	type DragEndEvent,
+	type CollisionDetection,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { gameClient } from "@/lib/network/client";
@@ -24,6 +26,16 @@ import {
 } from "./logic";
 
 // ── Helpers ──
+
+const workbenchCollisionDetection: CollisionDetection = (args) => {
+	const pointerCollisions = pointerWithin(args);
+	const itemCollision = pointerCollisions.find((collision) =>
+		String(collision.id).startsWith("drop-item-"),
+	);
+	if (itemCollision) return [itemCollision];
+	if (pointerCollisions.length > 0) return pointerCollisions;
+	return closestCenter(args);
+};
 
 const ITEM_EMOJI: Record<string, string> = {
 	"piala-gelas": "🧪", "pengaduk-kaca": "🥢", "hot-plate": "🔥", "corong-stand": "⏬",
@@ -437,7 +449,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 		<>
 			<div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
-			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+			<DndContext sensors={sensors} collisionDetection={workbenchCollisionDetection} onDragEnd={handleDragEnd}>
 				<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ touchAction: "none" }}>
 					<div
 						className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex flex-col"
