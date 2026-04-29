@@ -2290,6 +2290,15 @@ export class GameRoom extends DurableObject {
 				}
 			}
 
+			if (this.isItemKind(toolItem, "hot-plate") && this.isItemKind(container, "krus-porselen") && meta.dried) {
+				if (!meta.transferredToCrucible) {
+					this.blockWithConcept(playerId, "furnace.before_dry");
+					return true;
+				}
+				meta.tekluCharred = true;
+				return true;
+			}
+
 			if (this.isItemKind(toolItem, "hot-plate") && this.hasDissolvedTerusi(container)) {
 				if (!meta.acidified || this.getLiquidVolume(container, "h2so4") < 1) {
 					this.logDecision(container, "boil.applied", false);
@@ -2304,15 +2313,6 @@ export class GameRoom extends DurableObject {
 				this.clearIssue(container, "boil.no_acidify");
 
 				await this.completeMilestone(playerId, 4, "Larutan dididihkan di teklu");
-				return true;
-			}
-
-			if (this.isItemKind(toolItem, "hot-plate") && this.isItemKind(container, "krus-porselen") && meta.dried) {
-				if (!meta.transferredToCrucible) {
-					this.blockWithConcept(playerId, "furnace.before_dry");
-					return true;
-				}
-				meta.tekluCharred = true;
 				return true;
 			}
 

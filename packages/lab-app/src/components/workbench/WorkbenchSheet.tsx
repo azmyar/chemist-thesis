@@ -475,7 +475,13 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 			};
 			const kinds = [kindFromItemId(dragItemId), kindFromItemId(overItemId)];
 			if (kinds.includes("hot-plate")) {
-				slowSend(combineMsg, PROCESS_LABELS.hotPlate, PROCESS_DURATIONS.hotPlate);
+				const otherItemId = kindFromItemId(dragItemId) === "hot-plate" ? overItemId : dragItemId;
+				const otherItem = items.find((i) => i.itemId === otherItemId && i.quantity > 0);
+				if (otherItem && getItemKind(otherItem) === "krus-porselen" && otherItem.labMeta?.dried) {
+					slowSend(combineMsg, PROCESS_LABELS.tekluChar, PROCESS_DURATIONS.tekluChar);
+				} else {
+					slowSend(combineMsg, PROCESS_LABELS.hotPlate, PROCESS_DURATIONS.hotPlate);
+				}
 			} else if (kinds.includes("meker")) {
 				slowSend(combineMsg, PROCESS_LABELS.meker, PROCESS_DURATIONS.meker);
 			} else if (kinds.includes("desikator")) {
