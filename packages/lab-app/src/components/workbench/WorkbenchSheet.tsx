@@ -50,6 +50,18 @@ function canDiscardItemContents(item: InventoryItem | HeldItem): boolean {
 	return item.maxVolumeMl !== undefined || kind === "corong-stand";
 }
 
+function hasSolidKind(item: InventoryItem | undefined, kind: string): boolean {
+	return (item?.contents ?? []).some(
+		(c) => kindFromItemId(c.itemId) === kind && (c.weightGrams ?? 0) > 0,
+	);
+}
+
+function hasLiquidKind(item: InventoryItem | undefined, kind: string): boolean {
+	return (item?.contents ?? []).some(
+		(c) => kindFromItemId(c.itemId) === kind && (c.volumeMl ?? 0) > 0,
+	);
+}
+
 // ── Draggable card — element itself moves (no DragOverlay) ──
 
 function DraggableCard({ id, item, variant, onDetachFilter, onDetachReceiver }: {
@@ -201,6 +213,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 		sourceName: string;
 		targetName: string;
 		maxTransferMl: number;
+		completesDissolution?: boolean;
 	} | null>(null);
 	const [pourMl, setPourMl] = useState("");
 	const [dissolveDraft, setDissolveDraft] = useState<{
@@ -322,12 +335,17 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 				);
 				const maxTransferMl = Math.min(sourceItem!.volumeMl ?? 0, remainingCapacity);
 				if (maxTransferMl > 0) {
+					const completesDissolution =
+						getItemKind(sourceItem!) === "air-suling" &&
+						getItemKind(targetItem!) === "piala-gelas" &&
+						hasSolidKind(targetItem, "terusi");
 					setPourDraft({
 						sourceItemId: sourceItem!.itemId,
 						targetItemId: targetItem!.itemId,
 						sourceName: sourceItem!.name,
 						targetName: targetItem!.name,
 						maxTransferMl,
+						completesDissolution,
 					});
 					setPourMl(String(Math.min(10, Math.max(0.1, maxTransferMl))));
 					return;
@@ -335,6 +353,20 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 			}
 
 			if (canDissolve(sourceItem, targetItem)) {
+				const completesDissolution =
+					hasSolidKind(sourceItem, "terusi") &&
+					getItemKind(targetItem!) === "piala-gelas" &&
+					hasLiquidKind(targetItem, "air-suling");
+				if (!completesDissolution) {
+					gameClient.send({
+						type: "dissolve_item",
+						objectId,
+						sourceContainerItemId: sourceItem!.itemId,
+						targetContainerItemId: targetItem!.itemId,
+					});
+					return;
+				}
+
 				const solidSummary = (sourceItem?.contents ?? [])
 					.filter((c) => (c.weightGrams ?? 0) > 0)
 					.map((c) => `${c.name} ${(c.weightGrams ?? 0)}g`)
@@ -504,10 +536,19 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 			{pourDraft && (
 				<div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/35">
 					<div className="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl">
-						<h3 className="text-base font-semibold text-neutral-800">Penuangan Larutan</h3>
-						<p className="mt-1 text-sm text-neutral-600">
-							Tuang <span className="font-semibold">{pourDraft.sourceName}</span> ke <span className="font-semibold">{pourDraft.targetName}</span>
-						</p>
+						<h3 className="text-base font-semibold text-neutral-800">
+							{pourDraft.completesDissolution ? "Pelarutan" : "Penuangan Larutan"}
+						</h3>
+						{pourDraft.completesDissolution ? (
+							<p className="mt-1 text-sm text-neutral-600">
+								Tambahkan <span className="font-semibold">{pourDraft.sourceName}</span> ke{" "}
+								<span className="font-semibold">{pourDraft.targetName}</span> untuk melarutkan terusi?
+							</p>
+						) : (
+							<p className="mt-1 text-sm text-neutral-600">
+								Tuang <span className="font-semibold">{pourDraft.sourceName}</span> ke <span className="font-semibold">{pourDraft.targetName}</span>
+							</p>
+						)}
 						<p className="mt-1 text-xs text-neutral-500">Maks: {pourDraft.maxTransferMl} mL</p>
 
 						<div className="mt-4 flex gap-2">
@@ -525,7 +566,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 								onClick={handlePour}
 								className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
 							>
-								Tuang
+								{pourDraft.completesDissolution ? "Larutkan" : "Tuang"}
 							</button>
 						</div>
 
