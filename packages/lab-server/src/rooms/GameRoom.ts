@@ -1281,6 +1281,41 @@ export class GameRoom extends DurableObject {
 		return true;
 	}
 
+	private sendSnapshot(playerId: string): void {
+		const player = this.players.get(playerId);
+		if (!player) return;
+		const snapshot: ServerMessage = {
+			type: "snapshot",
+			selfId: playerId,
+			players: Array.from(this.players.values()).map((p) => p.state),
+			objects: Array.from(this.objects.values()),
+		};
+		this.sendTo(playerId, snapshot);
+	}
+
+	private async resetFinishedLevel(playerId: string, player: PlayerConnection): Promise<void> {
+		const state = await this.ensurePlayerLevelState(playerId);
+		if (!state.finished) {
+			this.sendError(player.ws, "Reset hanya tersedia setelah semua step selesai");
+			return;
+		}
+
+		this.objects.clear();
+		this.initDefaults();
+		await this.persistObjects();
+
+		const freshLevel = this.createDefaultLevelState();
+		freshLevel.lastEvent = "Praktikum direset. Mulai lagi dari penimbangan sampel.";
+		this.levelStates.set(playerId, freshLevel);
+		await this.persistPlayerLevelState(playerId);
+
+		player.state.holding = [];
+		this.persistPlayerState(player.ws, player.state);
+		this.sendSnapshot(playerId);
+		this.sendTo(playerId, { type: "level_state", level: freshLevel });
+		this.broadcast({ type: "player_hold", playerId, holding: player.state.holding });
+	}
+
 	/** Send a single server message to one player's websocket. Used for per-user
 	 *  events like level_state and level_report that should not leak to other
 	 *  players. Silently no-ops if the player is not connected. */
@@ -1326,6 +1361,7 @@ export class GameRoom extends DurableObject {
 			discard_object_contents: { max: 12, windowMs: 3000 },
 			discard_held_contents: { max: 12, windowMs: 3000 },
 			detach_setup_part: { max: 12, windowMs: 3000 },
+			reset_level: { max: 2, windowMs: 5000 },
 		};
 
 		const { max, windowMs } = config[type];
@@ -1542,6 +1578,10 @@ export class GameRoom extends DurableObject {
 
 	private async handleClientMessage(playerId: string, player: PlayerConnection, msg: ClientMessage): Promise<void> {
 		switch (msg.type) {
+			case "reset_level": {
+				await this.resetFinishedLevel(playerId, player);
+				break;
+			}
 			case "chat": {
 				const text = msg.text.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 200);
 				if (!text) {

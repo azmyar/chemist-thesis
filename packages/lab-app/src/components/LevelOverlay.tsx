@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LevelState } from "@/lib/protocol";
+import { gameClient } from "@/lib/network/client";
 
 function useIsCompact() {
 	const [compact, setCompact] = useState(false);
@@ -53,6 +54,14 @@ export function LevelOverlay() {
 	if (!level) return null;
 
 	const progress = Math.round((completedCount / level.milestones.length) * 100);
+	const handleReset = () => {
+		if (!level.finished) return;
+		const confirmed = window.confirm("Reset praktikum dan mulai lagi dari step 1?");
+		if (!confirmed) return;
+		window.localStorage.removeItem(`chemist-lab-guided-concepts:${level.levelId}`);
+		window.dispatchEvent(new CustomEvent("level-reset"));
+		gameClient.send({ type: "reset_level" });
+	};
 
 	if (compact && !expanded) {
 		return (
@@ -126,6 +135,15 @@ export function LevelOverlay() {
 							{level.finished ? "Selesai" : "Berjalan"}
 						</span>
 					</div>
+					{level.finished && (
+						<button
+							type="button"
+							onClick={handleReset}
+							className="mt-2 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 active:bg-red-200"
+						>
+							Reset Praktikum
+						</button>
+					)}
 				</div>
 
 				{expanded && (

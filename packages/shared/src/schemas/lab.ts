@@ -308,6 +308,10 @@ export const clientDetachSetupPartSchema = z.object({
 	part: setupDetachPartSchema,
 });
 
+export const clientResetLevelSchema = z.object({
+	type: z.literal("reset_level"),
+});
+
 export const clientMessageSchema = z.discriminatedUnion("type", [
 	clientMoveSchema,
 	clientStopSchema,
@@ -324,6 +328,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 	clientDiscardObjectContentsSchema,
 	clientDiscardHeldContentsSchema,
 	clientDetachSetupPartSchema,
+	clientResetLevelSchema,
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
