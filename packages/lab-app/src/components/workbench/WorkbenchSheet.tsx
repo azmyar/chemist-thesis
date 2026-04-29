@@ -395,7 +395,11 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 					0,
 					(targetItem!.maxVolumeMl ?? 0) - getContainerUsedVolume(targetItem!),
 				);
-				const maxTransferMl = Math.min(sourceItem!.volumeMl ?? 0, remainingCapacity);
+				const isSulfateTestPour =
+					(getItemKind(sourceItem!) === "hcl" || getItemKind(sourceItem!) === "bacl2") &&
+					getItemKind(targetItem!) === "tabung-reaksi" &&
+					(Boolean(targetItem!.labMeta?.fromFiltrate) || hasLiquidKind(targetItem, "filtrat-cucian"));
+				const maxTransferMl = Math.min(sourceItem!.volumeMl ?? 0, remainingCapacity, isSulfateTestPour ? 1 : Infinity);
 				if (maxTransferMl > 0) {
 					const completesDissolution =
 						getItemKind(sourceItem!) === "air-suling" &&
@@ -409,7 +413,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 						maxTransferMl,
 						completesDissolution,
 					});
-					setPourMl(String(Math.min(10, Math.max(0.1, maxTransferMl))));
+					setPourMl(String(isSulfateTestPour ? maxTransferMl : Math.min(10, Math.max(0.1, maxTransferMl))));
 					return;
 				}
 			}

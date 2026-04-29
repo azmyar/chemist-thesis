@@ -41,6 +41,8 @@ const CUO_FROM_TERUSI_RATIO = 0.3186;
 const CUOH2_FROM_TERUSI_RATIO = 0.3907;
 const GRAVIMETRIC_FACTOR_CU_CUO = 0.7987;
 const THEORETICAL_CU_PERCENT = 25.45;
+const TEST_TUBE_MAX_VOLUME_ML = 20;
+const SULFATE_TEST_REAGENT_ML = 1;
 
 const LEVEL_MILESTONES = [
 	"Timbang terusi ±0,5g ke kaca arloji",
@@ -286,6 +288,10 @@ export class GameRoom extends DurableObject {
 			shouldPersist = true;
 		}
 
+		if (this.normalizeTestTubeCapacity()) {
+			shouldPersist = true;
+		}
+
 		// Migration: append reagent variants introduced in later versions to
 		// existing rooms so persisted state doesn't lock students to an old
 		// reagent set.
@@ -389,7 +395,7 @@ export class GameRoom extends DurableObject {
 				{ itemId: "corong-stand", name: "Corong + Stand", category: "alat", quantity: 1 },
 				{ itemId: "kertas-saring", name: "Kertas Saring Whatman", category: "alat", quantity: 3, maxVolumeMl: 20, contents: [] },
 				{ itemId: "erlenmeyer", name: "Erlenmeyer", category: "alat", quantity: 1, maxVolumeMl: 250, contents: [] },
-				{ itemId: "tabung-reaksi", name: "Tabung Reaksi", category: "alat", quantity: 2, maxVolumeMl: 10, contents: [] },
+				{ itemId: "tabung-reaksi", name: "Tabung Reaksi", category: "alat", quantity: 2, maxVolumeMl: TEST_TUBE_MAX_VOLUME_ML, contents: [] },
 				{ itemId: "kertas-lakmus", name: "Kertas Lakmus Merah", category: "alat", quantity: 5 },
 				{ itemId: "krus-porselen", name: "Krus Porselen", category: "alat", quantity: 1, maxVolumeMl: 30, contents: [] },
 				{ itemId: "kaca-arloji", name: "Kaca Arloji", category: "alat", quantity: 3, maxVolumeMl: 50, contents: [] },
@@ -448,6 +454,19 @@ export class GameRoom extends DurableObject {
 			for (const item of obj.items) {
 				if (this.itemKind(item) === "hot-plate" && item.name !== "Teklu") {
 					item.name = "Teklu";
+					changed = true;
+				}
+			}
+		}
+		return changed;
+	}
+
+	private normalizeTestTubeCapacity(): boolean {
+		let changed = false;
+		for (const obj of this.objects.values()) {
+			for (const item of obj.items) {
+				if (this.isItemKind(item, "tabung-reaksi") && (item.maxVolumeMl ?? 0) < TEST_TUBE_MAX_VOLUME_ML) {
+					item.maxVolumeMl = TEST_TUBE_MAX_VOLUME_ML;
 					changed = true;
 				}
 			}
@@ -700,6 +719,22 @@ export class GameRoom extends DurableObject {
 		return item.category === "alat" && item.maxVolumeMl !== undefined;
 	}
 
+	private getMaxVolume(item: ContainerLike): number {
+		if (this.isItemKind(item, "tabung-reaksi")) {
+			return Math.max(item.maxVolumeMl ?? 0, TEST_TUBE_MAX_VOLUME_ML);
+		}
+		return item.maxVolumeMl ?? 0;
+	}
+
+	private isSulfateTestReagentKind(kind: string): boolean {
+		return kind === "hcl" || kind === "bacl2";
+	}
+
+	private isFiltrateTestTube(item: ContainerLike): boolean {
+		if (!this.isItemKind(item, "tabung-reaksi")) return false;
+		return Boolean(item.labMeta?.fromFiltrate) || this.getLiquidVolume(item, "filtrat-cucian") > 0;
+	}
+
 	private hasTool(obj: GameObjectState, itemId: string): boolean {
 		return obj.items.some((i) => this.isItemKind(i, itemId) && i.quantity > 0);
 	}
@@ -818,6 +853,32 @@ export class GameRoom extends DurableObject {
 		if (targetMeta.fromFiltrate && targetMeta.sulfateTestHclAdded && targetMeta.sulfateTestBaCl2Added) {
 			await this.completeMilestone(playerId, 9, "Uji sulfat selesai: filtrat cucian diasamkan HCl lalu diuji BaCl2");
 		}
+	}
+
+	private async applySulfateTestReagent(
+		playerId: string,
+		source: ContainerLike,
+		target: ContainerLike,
+		requestedMl = SULFATE_TEST_REAGENT_ML,
+	): Promise<boolean> {
+		const sourceKind = this.itemKind(source);
+		if (!this.isSulfateTestReagentKind(sourceKind) || !this.isFiltrateTestTube(target)) return false;
+		if ((source.volumeMl ?? 0) <= 0) return false;
+
+		const remainingCapacity = Math.max(0, this.getMaxVolume(target) - this.getContentsVolume(target.contents));
+		const transferMl = this.round4(Math.min(SULFATE_TEST_REAGENT_ML, requestedMl, source.volumeMl ?? 0, remainingCapacity));
+		if (transferMl <= 0) return false;
+
+		source.volumeMl = this.round4((source.volumeMl ?? 0) - transferMl);
+		if (source.volumeMl <= 0.0001) source.volumeMl = 0;
+		this.upsertLiquid(target, source.itemId, source.name, transferMl);
+
+		const targetMeta = this.ensureLabMeta(target);
+		targetMeta.fromFiltrate = true;
+		if (sourceKind === "hcl") targetMeta.sulfateTestHclAdded = true;
+		if (sourceKind === "bacl2") targetMeta.sulfateTestBaCl2Added = true;
+		await this.completeSulfateTestIfReady(playerId, target);
+		return true;
 	}
 
 	private mergeContents(target: ContainerContent[], additions: ContainerContent[]): void {
@@ -1584,22 +1645,11 @@ export class GameRoom extends DurableObject {
 					this.isItemKind(target, "tabung-reaksi") &&
 					(heldKind === "hcl" || heldKind === "bacl2")
 				) {
-					const currentVolumeInTarget = this.getContentsVolume(target.contents);
-					const remainingCapacity = Math.max(0, (target.maxVolumeMl ?? 0) - currentVolumeInTarget);
-					const transferMl = this.round4(Math.min(1, held.volumeMl ?? 0, remainingCapacity));
-					if (transferMl <= 0) {
+					const applied = await this.applySulfateTestReagent(playerId, held, target);
+					if (!applied) {
 						this.sendError(player.ws, "Wadah sudah penuh");
 						break;
 					}
-
-					held.volumeMl = this.round4((held.volumeMl ?? 0) - transferMl);
-					if (held.volumeMl <= 0.0001) held.volumeMl = 0;
-					this.upsertLiquid(target, held.itemId, held.name, transferMl);
-
-					if (heldKind === "hcl") targetMeta.sulfateTestHclAdded = true;
-					if (heldKind === "bacl2") targetMeta.sulfateTestBaCl2Added = true;
-					await this.completeSulfateTestIfReady(playerId, target);
-
 					handled = true;
 				}
 
@@ -1682,21 +1732,26 @@ export class GameRoom extends DurableObject {
 					break;
 				}
 
+				const targetMeta = this.ensureLabMeta(target);
+				const sourceKind = this.itemKind(source);
 				const currentVolumeInTarget = (target.contents ?? []).reduce((sum, c) => sum + (c.volumeMl ?? 0), 0);
-				const remainingCapacity = Math.max(0, target.maxVolumeMl - currentVolumeInTarget);
+				const remainingCapacity = Math.max(0, this.getMaxVolume(target) - currentVolumeInTarget);
 				if (remainingCapacity <= 0) {
 					this.sendError(player.ws, "Wadah sudah penuh");
 					break;
 				}
 
-				const transferMl = Math.min(msg.transferMl, source.volumeMl, remainingCapacity);
+				const isSulfateTestPour = this.isFiltrateTestTube(target) && this.isSulfateTestReagentKind(sourceKind);
+				const transferMl = Math.min(
+					isSulfateTestPour ? SULFATE_TEST_REAGENT_ML : msg.transferMl,
+					source.volumeMl,
+					remainingCapacity,
+				);
 				if (transferMl <= 0) {
 					this.sendError(player.ws, "Volume penuangan tidak valid");
 					break;
 				}
 
-				const targetMeta = this.ensureLabMeta(target);
-				const sourceKind = this.itemKind(source);
 				const isPengendap =
 					sourceKind === "naoh" ||
 					sourceKind === "naoh-1n" ||
@@ -1824,6 +1879,7 @@ export class GameRoom extends DurableObject {
 				}
 
 				if (this.isItemKind(target, "tabung-reaksi")) {
+					if (isSulfateTestPour) targetMeta.fromFiltrate = true;
 					if (this.isItemKind(source, "hcl")) targetMeta.sulfateTestHclAdded = true;
 					if (this.isItemKind(source, "bacl2")) targetMeta.sulfateTestBaCl2Added = true;
 					await this.completeSulfateTestIfReady(playerId, target);
@@ -2111,6 +2167,17 @@ export class GameRoom extends DurableObject {
 		const container = containerA ?? containerB;
 		if (container && toolItem) {
 			const meta = this.ensureLabMeta(container);
+
+			if (
+				toolItem.category === "bahan" &&
+				(toolItem.volumeMl ?? 0) > 0 &&
+				this.isFiltrateTestTube(container) &&
+				this.isSulfateTestReagentKind(this.itemKind(toolItem))
+			) {
+				if (await this.applySulfateTestReagent(playerId, toolItem, container)) {
+					return true;
+				}
+			}
 
 			if (this.isItemKind(toolItem, "hot-plate") && this.hasDissolvedTerusi(container)) {
 				if (!meta.acidified || this.getLiquidVolume(container, "h2so4") < 1) {
