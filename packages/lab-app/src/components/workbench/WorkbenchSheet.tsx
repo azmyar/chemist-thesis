@@ -197,10 +197,23 @@ function DroppableSlot({ item, children }: { item: InventoryItem; children: Reac
 	});
 
 	return (
-		<div ref={setNodeRef} className={`rounded-xl transition-all ${isOver ? "ring-2 ring-blue-400 scale-105" : ""}`}>
+		<div
+			ref={setNodeRef}
+			data-workbench-item-id={item.itemId}
+			className={`rounded-xl transition-all ${isOver ? "ring-2 ring-blue-400 scale-105" : ""}`}
+		>
 			{children}
 		</div>
 	);
+}
+
+function findWorkspaceItemAtPoint(x: number, y: number, excludeItemId?: string): string | undefined {
+	for (const el of document.elementsFromPoint(x, y)) {
+		const holder = el instanceof HTMLElement ? el.closest<HTMLElement>("[data-workbench-item-id]") : null;
+		const itemId = holder?.dataset.workbenchItemId;
+		if (itemId && itemId !== excludeItemId) return itemId;
+	}
+	return undefined;
 }
 
 // ── Main ──
@@ -286,7 +299,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 				: overId.startsWith("drop-item-") ? "workspace-item"
 				: undefined);
 
-		const overItemId = (over?.data.current?.itemId as string | undefined)
+		let overItemId = (over?.data.current?.itemId as string | undefined)
 			?? (overId.startsWith("drop-item-") ? overId.slice("drop-item-".length) : undefined);
 
 		const translated = active.rect.current.translated ?? active.rect.current.initial;
@@ -294,6 +307,11 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 		if (translated) {
 			const centerX = translated.left + translated.width / 2;
 			const centerY = translated.top + translated.height / 2;
+			const pointedItemId = findWorkspaceItemAtPoint(centerX, centerY, dragItemId);
+			if (pointedItemId) {
+				overItemId = pointedItemId;
+				overType = "workspace-item";
+			}
 
 			const inRect = (el: HTMLDivElement | null) => {
 				if (!el) return false;
