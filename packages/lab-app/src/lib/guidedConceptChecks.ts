@@ -159,16 +159,16 @@ export const GUIDED_CONCEPT_CHECKS: GuidedConceptCheck[] = [
 	},
 	{
 		step: 12,
-		title: "Pemijaran dan Desikator",
-		question: "Mengapa residu harus didinginkan dalam desikator sebelum ditimbang?",
+		title: "Pemijaran Bertahap",
+		question: "Mengapa setelah oven residu dipindahkan ke cawan porselen, diarangkan dengan teklu, lalu dipijarkan dengan meker?",
 		options: [
-			{ id: "a", text: "Agar residu dingin tanpa menyerap uap air dari udara." },
-			{ id: "b", text: "Agar CuO larut dalam udara." },
-			{ id: "c", text: "Agar neraca membaca massa lebih kecil secara sengaja." },
+			{ id: "a", text: "Agar kertas saring terbakar bertahap tanpa kehilangan sampel, lalu residu berubah stabil menjadi CuO." },
+			{ id: "b", text: "Agar CuO larut kembali menjadi CuSO4." },
+			{ id: "c", text: "Agar cawan porselen menambah massa CuO secara sengaja." },
 		],
 		correctOptionId: "a",
-		explanation: "Benda panas dapat menyebabkan pembacaan neraca tidak stabil, dan residu dapat menyerap kelembapan jika didinginkan di udara terbuka.",
-		relatedConcept: "Pendinginan dan stabilitas massa",
+		explanation: "Pemanasan bertahap mencegah kertas saring menyala mendadak dan membawa sampel keluar. Setelah dipijarkan, residu harus didinginkan dalam desikator sebelum ditimbang.",
+		relatedConcept: "Pengabuan dan pemijaran bertahap",
 	},
 	{
 		step: 13,

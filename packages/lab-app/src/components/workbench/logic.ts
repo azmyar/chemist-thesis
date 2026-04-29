@@ -25,6 +25,8 @@ export function formatInfo(item: InventoryItem | HeldItem): string {
 	if (item.labMeta?.washed) parts.push("dicuci");
 	if (item.labMeta?.fromFiltrate) parts.push("filtrat cucian");
 	if (item.labMeta?.dried) parts.push("kering");
+	if (item.labMeta?.transferredToCrucible) parts.push("di cawan");
+	if (item.labMeta?.tekluCharred) parts.push("diarangkan");
 	if (item.labMeta?.calcined) parts.push("dipijar");
 	if (item.labMeta?.cooled) parts.push("didinginkan");
 	return parts.join(" · ");

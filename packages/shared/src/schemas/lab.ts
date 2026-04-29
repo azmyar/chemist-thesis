@@ -47,6 +47,8 @@ export const labContainerMetaSchema = z.object({
 	sulfateTestBaCl2Added: z.boolean().optional(),
 	baseTested: z.boolean().optional(),
 	dried: z.boolean().optional(),
+	transferredToCrucible: z.boolean().optional(),
+	tekluCharred: z.boolean().optional(),
 	calcined: z.boolean().optional(),
 	cooled: z.boolean().optional(),
 	cuoMassG: z.number().optional(),

@@ -32,7 +32,7 @@ export const PROCESS_DURATIONS = {
 
 export const PROCESS_LABELS = {
 	oven: "Mengeringkan endapan di oven…",
-	furnace: "Memijarkan residu di tanur…",
+	furnace: "Memijarkan residu di meker…",
 	hotPlate: "Memanaskan larutan di teklu…",
 	desikator: "Mendinginkan di desikator…",
 } as const;

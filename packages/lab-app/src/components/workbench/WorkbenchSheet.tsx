@@ -394,8 +394,11 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 			const isFilterToWatchGlass =
 				(sourceKind === "kertas-saring" && targetKind === "kaca-arloji") ||
 				(sourceKind === "kaca-arloji" && targetKind === "kertas-saring");
+			const isResidueToCrucible =
+				(sourceKind === "krus-porselen" && (targetKind === "kaca-arloji" || targetKind === "kertas-saring")) ||
+				(targetKind === "krus-porselen" && (sourceKind === "kaca-arloji" || sourceKind === "kertas-saring"));
 
-			if (isFilterToWatchGlass) {
+			if (isFilterToWatchGlass || isResidueToCrucible) {
 				gameClient.send({
 					type: "combine_items",
 					objectId,

@@ -26,7 +26,7 @@ const OBJECT_LABELS: Record<GameObjectType, string> = {
 	reagent_table: "Meja Pereaksi",
 	timbangan: "Timbangan Analitik",
 	oven: "Oven Pengering",
-	furnace: "Tanur (Furnace)",
+	furnace: "Meker",
 };
 
 const OBJECT_DESC: Record<GameObjectType, string> = {
@@ -35,7 +35,7 @@ const OBJECT_DESC: Record<GameObjectType, string> = {
 	reagent_table: "Tempat penyimpanan bahan/pereaksi",
 	timbangan: "Pegang wadah + bahan padat, lalu timbang",
 	oven: "Taruh wadah sampel untuk proses pengeringan",
-	furnace: "Taruh wadah sampel untuk proses pemijaran",
+	furnace: "Taruh cawan porselen yang sudah diarangkan di teklu",
 };
 
 const ITEM_EMOJI: Record<string, string> = {

@@ -56,7 +56,7 @@ const LEVEL_MILESTONES = [
 	"Uji pengotor sulfat (HCl + BaCl2)",
 	"Uji basa dengan kertas lakmus",
 	"Keringkan endapan di oven",
-	"Pijarkan di furnace lalu dinginkan di desikator",
+	"Pindahkan ke krus, arangkan di teklu, pijarkan di meker, lalu dinginkan",
 	"Timbang residu CuO",
 	"Ulangi pijar-dingin-timbang sampai bobot tetap",
 ] as const;
@@ -178,10 +178,10 @@ const CONCEPT_FEEDBACK: Record<string, ConceptFeedback> = {
 	},
 	"furnace.before_dry": {
 		code: "furnace.before_dry",
-		title: "Keringkan endapan sebelum pemijaran",
-		why: "Endapan dan kertas saring perlu dikeringkan dahulu agar pemijaran berlangsung stabil dan massa akhir lebih dapat dipercaya.",
-		correction: "Masukkan endapan ke oven pengering sebelum dipijarkan di furnace.",
-		relatedConcept: "Pengeringan dan pemijaran",
+		title: "Siapkan krus sebelum pemijaran",
+		why: "Endapan kering dari kaca arloji belum siap langsung dipijarkan. Residu perlu dipindahkan ke cawan porselen, diarangkan perlahan dengan teklu, lalu dipijarkan lebih kuat dengan meker.",
+		correction: "Pindahkan kertas saring/endapan dari kaca arloji ke krus porselen, panaskan dulu dengan teklu, lalu lanjutkan di meker.",
+		relatedConcept: "Pengabuan kertas saring dan pemijaran bertahap",
 		blocking: true,
 	},
 };
@@ -397,7 +397,7 @@ export class GameRoom extends DurableObject {
 				{ itemId: "erlenmeyer", name: "Erlenmeyer", category: "alat", quantity: 1, maxVolumeMl: 250, contents: [] },
 				{ itemId: "tabung-reaksi", name: "Tabung Reaksi", category: "alat", quantity: 2, maxVolumeMl: TEST_TUBE_MAX_VOLUME_ML, contents: [] },
 				{ itemId: "kertas-lakmus", name: "Kertas Lakmus Merah", category: "alat", quantity: 5 },
-				{ itemId: "krus-porselen", name: "Krus Porselen", category: "alat", quantity: 1, maxVolumeMl: 30, contents: [] },
+				{ itemId: "krus-porselen", name: "Cawan Porselen", category: "alat", quantity: 1, maxVolumeMl: 30, contents: [] },
 				{ itemId: "kaca-arloji", name: "Kaca Arloji", category: "alat", quantity: 3, maxVolumeMl: 50, contents: [] },
 				{ itemId: "desikator", name: "Desikator", category: "alat", quantity: 1 },
 			],
@@ -454,6 +454,10 @@ export class GameRoom extends DurableObject {
 			for (const item of obj.items) {
 				if (this.itemKind(item) === "hot-plate" && item.name !== "Teklu") {
 					item.name = "Teklu";
+					changed = true;
+				}
+				if (this.itemKind(item) === "krus-porselen" && item.name !== "Cawan Porselen") {
+					item.name = "Cawan Porselen";
 					changed = true;
 				}
 			}
@@ -1157,6 +1161,38 @@ export class GameRoom extends DurableObject {
 		return true;
 	}
 
+	private moveDriedResidueToCrucible(sourceItem: InventoryItem, crucible: InventoryItem): boolean {
+		if (!this.isItemKind(crucible, "krus-porselen")) return false;
+		if (!this.isItemKind(sourceItem, "kaca-arloji") && !this.isItemKind(sourceItem, "kertas-saring")) return false;
+		if (!this.hasSolid(sourceItem, "endapan-cuoh2") && !this.hasSolid(sourceItem, "cuo-hasil-pijar")) return false;
+
+		const sourceMeta = this.ensureLabMeta(sourceItem);
+		if (!sourceMeta.dried) return false;
+
+		if (!crucible.contents) crucible.contents = [];
+		this.mergeContents(crucible.contents, this.cloneContents(sourceItem.contents));
+
+		const crucibleMeta = this.ensureLabMeta(crucible);
+		crucibleMeta.precipitated = true;
+		crucibleMeta.filtered = true;
+		crucibleMeta.washed = sourceMeta.washed;
+		crucibleMeta.baseTested = sourceMeta.baseTested;
+		crucibleMeta.dried = true;
+		crucibleMeta.transferredToCrucible = true;
+		crucibleMeta.sampleTerusiG = sourceMeta.sampleTerusiG;
+		crucibleMeta.decisions = sourceMeta.decisions ? { ...sourceMeta.decisions } : crucibleMeta.decisions;
+		crucibleMeta.outcomes = sourceMeta.outcomes
+			? {
+				...sourceMeta.outcomes,
+				issues: sourceMeta.outcomes.issues ? [...sourceMeta.outcomes.issues] : undefined,
+			}
+			: crucibleMeta.outcomes;
+
+		sourceItem.contents = [];
+		sourceItem.labMeta = undefined;
+		return true;
+	}
+
 	private clearContainerContents(item: ContainerLike): void {
 		const isSetup = this.isItemKind(item, "corong-stand");
 		if (!this.isContainer(item) && !isSetup) return;
@@ -1591,7 +1627,7 @@ export class GameRoom extends DurableObject {
 				}
 				if (destObj.objectType === "furnace" && this.isContainer(held)) {
 					const meta = held.labMeta ?? {};
-					if (!meta.dried) {
+					if (!this.isItemKind(held, "krus-porselen") || !meta.dried || !meta.transferredToCrucible || !meta.tekluCharred) {
 						this.blockWithConcept(playerId, "furnace.before_dry");
 						break;
 					}
@@ -2181,6 +2217,14 @@ export class GameRoom extends DurableObject {
 			}
 		}
 
+		const crucibleItem = this.isItemKind(itemA, "krus-porselen") ? itemA : this.isItemKind(itemB, "krus-porselen") ? itemB : null;
+		const residueSourceItem = crucibleItem ? (crucibleItem === itemA ? itemB : itemA) : null;
+		if (crucibleItem && residueSourceItem) {
+			if (this.moveDriedResidueToCrucible(residueSourceItem, crucibleItem)) {
+				return true;
+			}
+		}
+
 		const containerA = this.isContainer(itemA) ? itemA : null;
 		const containerB = this.isContainer(itemB) ? itemB : null;
 
@@ -2231,6 +2275,15 @@ export class GameRoom extends DurableObject {
 				return true;
 			}
 
+			if (this.isItemKind(toolItem, "hot-plate") && this.isItemKind(container, "krus-porselen") && meta.dried) {
+				if (!meta.transferredToCrucible) {
+					this.blockWithConcept(playerId, "furnace.before_dry");
+					return true;
+				}
+				meta.tekluCharred = true;
+				return true;
+			}
+
 			if (this.isItemKind(toolItem, "pengaduk-kaca") && meta.precipitated) {
 				meta.stirred = true;
 				await this.completeMilestone(playerId, 5, "Endapan dibentuk dan diaduk");
@@ -2268,7 +2321,7 @@ export class GameRoom extends DurableObject {
 			}
 
 			if (this.isItemKind(toolItem, "furnace-lab") && (meta.filtered || meta.washed || meta.dried || meta.calcined || meta.cooled)) {
-				if (!meta.dried) {
+				if (!this.isItemKind(container, "krus-porselen") || !meta.dried || !meta.transferredToCrucible || !meta.tekluCharred) {
 					this.blockWithConcept(playerId, "furnace.before_dry");
 					return true;
 				}
@@ -2420,7 +2473,7 @@ export class GameRoom extends DurableObject {
 
 		if (destObj.objectType === "furnace") {
 			const meta = this.ensureLabMeta(item);
-			if (meta.dried || meta.calcined || meta.cooled) {
+			if (this.isItemKind(item, "krus-porselen") && meta.dried && meta.transferredToCrucible && meta.tekluCharred) {
 				meta.calcined = true;
 				meta.cooled = false;
 				this.applyCalcination(item);

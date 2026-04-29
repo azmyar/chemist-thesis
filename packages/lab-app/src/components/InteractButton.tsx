@@ -9,7 +9,7 @@ const OBJECT_LABELS: Record<GameObjectType, string> = {
 	reagent_table: "Pereaksi",
 	timbangan: "Timbangan",
 	oven: "Oven",
-	furnace: "Tanur",
+	furnace: "Meker",
 };
 
 export function InteractButton() {
