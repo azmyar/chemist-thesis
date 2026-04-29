@@ -581,7 +581,7 @@ export class GameRoom extends DurableObject {
 	private computeLevelReport(container: ContainerLike): LevelReport {
 		const meta = container.labMeta ?? {};
 		const sampleMassG = this.round4(meta.sampleTerusiG ?? 0);
-		const cuoMassG = this.round4(meta.cuoMassG ?? 0);
+		const cuoMassG = this.round4(meta.lastRecordedMassG ?? meta.cuoMassG ?? 0);
 		const kadarRaw = sampleMassG > 0 ? (cuoMassG * GRAVIMETRIC_FACTOR_CU_CUO) / sampleMassG * 100 : 0;
 		const kadarPercent = Math.round(kadarRaw * 100) / 100;
 		const deviationPercent = Math.round((kadarPercent - THEORETICAL_CU_PERCENT) * 100) / 100;

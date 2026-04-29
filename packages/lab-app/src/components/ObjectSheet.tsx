@@ -98,12 +98,16 @@ function formatMeasurement(item: InventoryItem | HeldItem): string {
 		const inner = item.contents
 			.map((c) => {
 				let base = c.name;
-				if (c.weightGrams) base = `${c.name} ${c.weightGrams}g`;
+				if (contentKind(c.itemId) === "cuo-hasil-pijar") base = c.name;
+				else if (c.weightGrams) base = `${c.name} ${c.weightGrams}g`;
 				else if (c.volumeMl) base = `${c.name} ${c.volumeMl}mL`;
 				return c.dissolved ? `${base} (terlarut)` : base;
 			})
 			.join(", ");
 		parts.push(`isi: ${inner}`);
+	}
+	if (item.labMeta?.lastRecordedMassG !== undefined) {
+		parts.push(`bobot tercatat ${item.labMeta.lastRecordedMassG}g`);
 	}
 	return parts.join(" · ");
 }
@@ -360,8 +364,9 @@ export function ObjectSheet() {
 			h.category === "alat" &&
 			(h.contents ?? []).some((c) => contentKind(c.itemId) === "cuo-hasil-pijar" && (c.weightGrams ?? 0) > 0),
 	);
+	const cuoBalanceReadingG = heldCuoContainer?.labMeta?.cuoMassG;
 	const canWeigh = isTimbangan && !!heldBahan && !!heldContainer;
-	const canRecordMass = isTimbangan && !!heldCuoContainer;
+	const canRecordMass = isTimbangan && !!heldCuoContainer && cuoBalanceReadingG !== undefined;
 
 	// Step 1 — Open-world weighing advisories for terusi sample.
 	// Scoop-based interaction; server accepts any cumulative mass.
@@ -540,29 +545,31 @@ export function ObjectSheet() {
 										</div>
 									) : canRecordMass ? (
 										<div className="mb-4 px-3 py-3 rounded-xl bg-blue-50 border border-blue-200">
-											<p className="text-sm text-blue-800 mb-2">
-												Catat bobot CuO dari <span className="font-semibold">{heldCuoContainer!.name}</span>
+											<p className="text-[11px] text-blue-700/80 uppercase tracking-wide">
+												Neraca Analitik
 											</p>
-											<div className="flex gap-2">
-												<input
-													type="number"
-													step="0.0001"
-													min="0"
-													value={recordMassG}
-													onChange={(e) => setRecordMassG(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") handleRecordMass(heldCuoContainer!.itemId);
-														e.stopPropagation();
-													}}
-													onKeyUp={(e) => e.stopPropagation()}
-													placeholder="Gram CuO..."
-													className="flex-1 px-3 py-2 rounded-lg border border-blue-200 bg-white text-sm text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-												/>
+											<div className="mt-1 flex items-baseline gap-2">
+												<span className="font-mono text-3xl font-semibold tabular-nums text-blue-800">
+													{cuoBalanceReadingG!.toFixed(4)}
+												</span>
+												<span className="text-sm text-neutral-500">g</span>
+											</div>
+											<p className="mt-0.5 text-[11px] text-blue-700/70">
+												{heldCuoContainer!.name} berisi CuO hasil pijar yang sudah didinginkan
+											</p>
+											<div className="mt-3 flex gap-2">
 												<button
-													onClick={() => handleRecordMass(heldCuoContainer!.itemId)}
-													className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors"
+													onClick={() => {
+														setRecordMassG(cuoBalanceReadingG!.toFixed(4));
+														gameClient.send({
+															type: "record_mass",
+															containerItemId: heldCuoContainer!.itemId,
+															measuredMassG: cuoBalanceReadingG!,
+														});
+													}}
+													className="w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 transition-colors"
 												>
-													Catat
+													Catat bobot CuO
 												</button>
 											</div>
 										</div>

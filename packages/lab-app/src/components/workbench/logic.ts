@@ -8,6 +8,7 @@ export function formatInfo(item: InventoryItem | HeldItem): string {
 	if (item.contents && item.contents.length > 0) {
 		const inner = item.contents
 			.map((c) => {
+				if (c.itemId === "cuo-hasil-pijar") return c.name;
 				const base = c.weightGrams
 					? `${c.name} ${c.weightGrams}g`
 					: c.volumeMl
@@ -29,6 +30,7 @@ export function formatInfo(item: InventoryItem | HeldItem): string {
 	if (item.labMeta?.tekluCharred) parts.push("diarangkan");
 	if (item.labMeta?.calcined) parts.push("dipijar");
 	if (item.labMeta?.cooled) parts.push("didinginkan");
+	if (item.labMeta?.lastRecordedMassG !== undefined) parts.push(`bobot tercatat ${item.labMeta.lastRecordedMassG}g`);
 	return parts.join(" · ");
 }
 
