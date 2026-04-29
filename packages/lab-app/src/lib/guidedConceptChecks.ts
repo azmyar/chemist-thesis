@@ -134,14 +134,14 @@ export const GUIDED_CONCEPT_CHECKS: GuidedConceptCheck[] = [
 	{
 		step: 10,
 		title: "Uji Basa",
-		question: "Mengapa sisa basa pada endapan perlu diuji sebelum pengeringan?",
+		question: "Pada tahap uji basa setelah pencucian, bagian mana yang diuji dengan kertas lakmus?",
 		options: [
-			{ id: "a", text: "Karena sisa basa dapat meninggalkan residu saat pemijaran dan mengganggu massa CuO." },
-			{ id: "b", text: "Karena basa akan mengubah CuO menjadi gas." },
-			{ id: "c", text: "Karena lakmus digunakan untuk menimbang CuO." },
+			{ id: "a", text: "Filtrat atau cairan cucian, karena itu menunjukkan apakah sisa basa masih terbawa dari endapan." },
+			{ id: "b", text: "Kaca arloji kosong, karena kaca arloji akan menyerap basa." },
+			{ id: "c", text: "CuO hasil pijar, karena lakmus dipakai setelah furnace." },
 		],
 		correctOptionId: "a",
-		explanation: "Endapan harus bebas pengotor larut. Sisa basa yang tidak tercuci dapat membuat massa akhir lebih besar dari yang seharusnya.",
+		explanation: "Uji basa dilakukan pada filtrat/cairan cucian. Jika filtrat masih basa, pencucian belum cukup dan residu basa dapat mengganggu massa akhir.",
 		relatedConcept: "Kemurnian endapan",
 	},
 	{

@@ -389,6 +389,21 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 		} else if (source === "workspace" && overType === "workspace-item" && overItemId && overItemId !== dragItemId) {
 			const sourceItem = items.find((i) => i.itemId === dragItemId && i.quantity > 0);
 			const targetItem = items.find((i) => i.itemId === overItemId && i.quantity > 0);
+			const sourceKind = sourceItem ? getItemKind(sourceItem) : "";
+			const targetKind = targetItem ? getItemKind(targetItem) : "";
+			const isFilterToWatchGlass =
+				(sourceKind === "kertas-saring" && targetKind === "kaca-arloji") ||
+				(sourceKind === "kaca-arloji" && targetKind === "kertas-saring");
+
+			if (isFilterToWatchGlass) {
+				gameClient.send({
+					type: "combine_items",
+					objectId,
+					itemIdA: dragItemId,
+					itemIdB: overItemId,
+				});
+				return;
+			}
 
 			if (canPour(sourceItem, targetItem)) {
 				const remainingCapacity = Math.max(

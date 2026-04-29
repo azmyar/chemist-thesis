@@ -735,6 +735,10 @@ export class GameRoom extends DurableObject {
 		return Boolean(item.labMeta?.fromFiltrate) || this.getLiquidVolume(item, "filtrat-cucian") > 0;
 	}
 
+	private isFiltrateContainer(item: ContainerLike): boolean {
+		return Boolean(item.labMeta?.fromFiltrate) || this.getLiquidVolume(item, "filtrat-cucian") > 0;
+	}
+
 	private hasTool(obj: GameObjectState, itemId: string): boolean {
 		return obj.items.some((i) => this.isItemKind(i, itemId) && i.quantity > 0);
 	}
@@ -1122,6 +1126,35 @@ export class GameRoom extends DurableObject {
 		const detachedReceiver = this.detachSetupReceiver(obj, setupItem);
 		const detachedFilter = this.detachSetupFilter(obj, setupItem);
 		return detachedReceiver || detachedFilter;
+	}
+
+	private moveFilterResidueToWatchGlass(filterItem: InventoryItem, watchGlass: InventoryItem): boolean {
+		if (!this.isItemKind(filterItem, "kertas-saring")) return false;
+		if (!this.isItemKind(watchGlass, "kaca-arloji")) return false;
+		if (!this.hasSolid(filterItem)) return false;
+
+		if (!watchGlass.contents) watchGlass.contents = [];
+		this.mergeContents(watchGlass.contents, this.cloneContents(filterItem.contents));
+
+		const filterMeta = this.ensureLabMeta(filterItem);
+		const watchMeta = this.ensureLabMeta(watchGlass);
+		watchMeta.precipitated = true;
+		watchMeta.filtered = true;
+		watchMeta.washed = filterMeta.washed;
+		watchMeta.baseTested = filterMeta.baseTested;
+		watchMeta.sampleTerusiG = filterMeta.sampleTerusiG;
+		watchMeta.decisions = filterMeta.decisions ? { ...filterMeta.decisions } : watchMeta.decisions;
+		watchMeta.outcomes = filterMeta.outcomes
+			? {
+				...filterMeta.outcomes,
+				issues: filterMeta.outcomes.issues ? [...filterMeta.outcomes.issues] : undefined,
+			}
+			: watchMeta.outcomes;
+
+		filterItem.contents = [];
+		filterItem.labMeta = undefined;
+		filterItem.quantity = 0;
+		return true;
 	}
 
 	private clearContainerContents(item: ContainerLike): void {
@@ -1545,6 +1578,10 @@ export class GameRoom extends DurableObject {
 					this.sendError(player.ws, "Station ini sedang digunakan wadah lain");
 					break;
 				}
+				if (destObj.objectType === "oven" && heldKind === "kertas-saring" && this.hasSolid(held)) {
+					this.sendError(player.ws, "Padukan kertas saring berisi endapan dengan kaca arloji sebelum dikeringkan");
+					break;
+				}
 				if (destObj.objectType === "oven" && this.isContainer(held)) {
 					const meta = held.labMeta ?? {};
 					if (!meta.washed || !this.isMilestoneDone(playerId, 9) || !this.isMilestoneDone(playerId, 10)) {
@@ -1662,9 +1699,9 @@ export class GameRoom extends DurableObject {
 							"Kertas lakmus merah berubah biru: larutan sudah basa dan pengendapan dinyatakan sempurna",
 						);
 						handled = true;
-					} else if (targetMeta.washed) {
+					} else if (this.isFiltrateContainer(target)) {
 						targetMeta.baseTested = true;
-						await this.completeMilestone(playerId, 10, "Uji basa dengan lakmus selesai");
+						await this.completeMilestone(playerId, 10, "Uji basa pada filtrat cucian dengan kertas lakmus selesai");
 						handled = true;
 					}
 				}
@@ -2085,16 +2122,6 @@ export class GameRoom extends DurableObject {
 				}
 			}
 
-			if (this.isItemKind(setupOther, "kertas-lakmus")) {
-				const setupMeta = this.ensureLabMeta(setupItem);
-				const hasResidue = (setupItem.contents ?? []).some((c) => (c.weightGrams ?? 0) > 0);
-				if (setupMeta.washed && hasResidue) {
-					setupMeta.baseTested = true;
-					await this.completeMilestone(playerId, 10, "Uji basa dengan lakmus pada setup penyaring selesai");
-					return true;
-				}
-			}
-
 			if (setupOther.category === "bahan" && this.isItemKind(setupOther, "air-suling") && (setupOther.volumeMl ?? 0) > 0) {
 				const setupMeta = this.ensureLabMeta(setupItem);
 				const hasResidue = (setupItem.contents ?? []).some((c) => (c.weightGrams ?? 0) > 0);
@@ -2143,6 +2170,14 @@ export class GameRoom extends DurableObject {
 						return true;
 					}
 				}
+			}
+		}
+
+		const filterItem = this.isItemKind(itemA, "kertas-saring") ? itemA : this.isItemKind(itemB, "kertas-saring") ? itemB : null;
+		const watchGlassItem = this.isItemKind(itemA, "kaca-arloji") ? itemA : this.isItemKind(itemB, "kaca-arloji") ? itemB : null;
+		if (filterItem && watchGlassItem) {
+			if (this.moveFilterResidueToWatchGlass(filterItem, watchGlassItem)) {
+				return true;
 			}
 		}
 
@@ -2212,14 +2247,17 @@ export class GameRoom extends DurableObject {
 					);
 					return true;
 				}
-				if (meta.washed) {
+				if (this.isFiltrateContainer(container)) {
 					meta.baseTested = true;
-					await this.completeMilestone(playerId, 10, "Uji basa dengan lakmus selesai");
+					await this.completeMilestone(playerId, 10, "Uji basa pada filtrat cucian dengan kertas lakmus selesai");
 					return true;
 				}
 			}
 
 			if (this.isItemKind(toolItem, "oven-lab") && (meta.filtered || meta.washed)) {
+				if (this.isItemKind(container, "kertas-saring") && this.hasSolid(container)) {
+					return false;
+				}
 				if (!meta.washed || !this.isMilestoneDone(playerId, 9) || !this.isMilestoneDone(playerId, 10)) {
 					this.blockWithConcept(playerId, "dry.before_wash_test");
 					return true;
