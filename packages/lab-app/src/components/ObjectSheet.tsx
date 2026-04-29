@@ -286,11 +286,11 @@ export function ObjectSheet() {
 				return;
 			}
 
-			if (source === "hand" && overId === "drop-object") {
+			if (objectType !== "timbangan" && source === "hand" && overId === "drop-object") {
 				handlePlace(activeItemId);
 			}
 		},
-		[handlePlace, handleTake],
+		[handlePlace, handleTake, objectType],
 	);
 
 	const handleWeigh = useCallback(() => {
@@ -405,33 +405,35 @@ export function ObjectSheet() {
 							onDragEnd={handleDragEnd}
 							onDragCancel={() => setActiveDrag(null)}
 						>
-							<DroppablePanel
-								id="drop-object"
-								className="mb-4 min-h-[180px] rounded-2xl border-2 border-dashed border-neutral-200 bg-neutral-50 p-3 transition-all"
-							>
-								<div className="mb-2 flex items-center justify-between">
-									<p className="text-xs font-semibold text-neutral-500">
-										{objectType ? OBJECT_LABELS[objectType] : "Objek"}
-									</p>
-									<p className="text-[10px] text-neutral-400">Drop item dari tangan ke sini</p>
-								</div>
-								{availableItems.length === 0 ? (
-									<p className="flex min-h-[112px] items-center justify-center text-sm text-neutral-300">
-										Kosong
-									</p>
-								) : (
-									<div className="flex max-h-[260px] flex-wrap content-start gap-3 overflow-y-auto pb-1">
-										{availableItems.map((item) => (
-											<DraggableObjectCard
-												key={item.itemId}
-												id={`object-${item.itemId}`}
-												item={item}
-												variant="object"
-											/>
-										))}
+							{!isTimbangan && (
+								<DroppablePanel
+									id="drop-object"
+									className="mb-4 min-h-[180px] rounded-2xl border-2 border-dashed border-neutral-200 bg-neutral-50 p-3 transition-all"
+								>
+									<div className="mb-2 flex items-center justify-between">
+										<p className="text-xs font-semibold text-neutral-500">
+											{objectType ? OBJECT_LABELS[objectType] : "Objek"}
+										</p>
+										<p className="text-[10px] text-neutral-400">Drop item dari tangan ke sini</p>
 									</div>
-								)}
-							</DroppablePanel>
+									{availableItems.length === 0 ? (
+										<p className="flex min-h-[112px] items-center justify-center text-sm text-neutral-300">
+											Kosong
+										</p>
+									) : (
+										<div className="flex max-h-[260px] flex-wrap content-start gap-3 overflow-y-auto pb-1">
+											{availableItems.map((item) => (
+												<DraggableObjectCard
+													key={item.itemId}
+													id={`object-${item.itemId}`}
+													item={item}
+													variant="object"
+												/>
+											))}
+										</div>
+									)}
+								</DroppablePanel>
+							)}
 
 							{isTimbangan && (
 								<>
@@ -582,7 +584,8 @@ export function ObjectSheet() {
 								<div className="mb-2 flex items-center justify-between">
 									<p className="text-xs font-semibold text-amber-500">🤲 Tangan</p>
 									<p className="text-[10px] text-amber-400">
-										{holding.length}/2 · Drop item dari objek ke sini
+										{holding.length}/2
+										{!isTimbangan && " · Drop item dari objek ke sini"}
 									</p>
 								</div>
 								<div className="flex min-h-[104px] gap-2 overflow-x-auto pb-1">
