@@ -236,6 +236,13 @@ export const clientPlaceItemSchema = z.object({
 	itemId: z.string(),
 });
 
+export const clientUseHeldOnItemSchema = z.object({
+	type: z.literal("use_held_on_item"),
+	objectId: z.string(),
+	heldItemId: z.string(),
+	targetItemId: z.string(),
+});
+
 export const clientWeighItemSchema = z.object({
 	type: z.literal("weigh_item"),
 	transferGrams: z.number().positive(),
@@ -305,6 +312,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 	clientChatSchema,
 	clientTakeItemSchema,
 	clientPlaceItemSchema,
+	clientUseHeldOnItemSchema,
 	clientWeighItemSchema,
 	clientScoopSampleSchema,
 	clientPourItemSchema,

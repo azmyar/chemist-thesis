@@ -82,14 +82,14 @@ export const GUIDED_CONCEPT_CHECKS: GuidedConceptCheck[] = [
 	{
 		step: 6,
 		title: "Uji Pengendapan Sempurna",
-		question: "Apa arti uji pengendapan sempurna yang tidak menghasilkan endapan baru?",
+		question: "Pada prosedur ini, indikator apa yang menunjukkan pengendapan Cu(OH)2 sudah cukup sempurna sebelum filtrasi?",
 		options: [
-			{ id: "a", text: "Cu2+ di cairan induk sudah terendapkan sehingga larutan siap disaring." },
-			{ id: "b", text: "Kertas saring sudah bebas abu." },
-			{ id: "c", text: "CuO sudah mencapai bobot tetap." },
+			{ id: "a", text: "Kertas lakmus merah berubah biru, menandakan larutan sudah basa setelah pengendap ditambahkan." },
+			{ id: "b", text: "Kertas saring sudah bebas abu sehingga filtrasi pasti sempurna." },
+			{ id: "c", text: "CuO sudah mencapai bobot tetap setelah pemijaran." },
 		],
 		correctOptionId: "a",
-		explanation: "Jika tambahan pengendap tidak membentuk endapan baru, Cu2+ yang tersisa dalam larutan sudah minimal sehingga penyaringan dapat dilakukan.",
+		explanation: "Perubahan lakmus merah menjadi biru menunjukkan suasana basa/kelebihan pengendap sudah tercapai, sehingga Cu2+ dalam larutan induk seharusnya sudah mengendap sebagai Cu(OH)2.",
 		relatedConcept: "Kelengkapan pengendapan",
 	},
 	{
@@ -211,4 +211,3 @@ export const FINAL_CONCEPT_CHECK: GuidedConceptCheck = {
 	explanation: "Faktor 0,7987 adalah perbandingan massa atom Cu terhadap massa molar CuO, sehingga massa CuO dikonversi menjadi massa Cu.",
 	relatedConcept: "Perhitungan kadar Cu",
 };
-

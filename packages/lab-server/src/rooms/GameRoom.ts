@@ -795,6 +795,31 @@ export class GameRoom extends DurableObject {
 		return (contents ?? []).reduce((sum, c) => sum + (c.volumeMl ?? 0), 0);
 	}
 
+	private transferFiltrateAliquot(sourceContents: ContainerContent[] | undefined, target: ContainerLike, maxTransferMl = 5): boolean {
+		const liquids = (sourceContents ?? []).filter((c) => (c.volumeMl ?? 0) > 0);
+		const totalVolume = this.getContentsVolume(liquids);
+		if (totalVolume <= 0) return false;
+
+		const transfer = this.round4(Math.min(maxTransferMl, totalVolume));
+		for (const liquid of liquids) {
+			const current = liquid.volumeMl ?? 0;
+			const portion = Math.min(current, this.round4((current / totalVolume) * transfer));
+			liquid.volumeMl = this.round4(current - portion);
+			if ((liquid.volumeMl ?? 0) <= 0.0001) liquid.volumeMl = 0;
+		}
+
+		this.upsertLiquid(target, "filtrat-cucian", "Filtrat Cucian", transfer);
+		this.ensureLabMeta(target).fromFiltrate = true;
+		return true;
+	}
+
+	private async completeSulfateTestIfReady(playerId: string, target: ContainerLike): Promise<void> {
+		const targetMeta = this.ensureLabMeta(target);
+		if (targetMeta.fromFiltrate && targetMeta.sulfateTestHclAdded && targetMeta.sulfateTestBaCl2Added) {
+			await this.completeMilestone(playerId, 9, "Uji sulfat selesai: filtrat cucian diasamkan HCl lalu diuji BaCl2");
+		}
+	}
+
 	private mergeContents(target: ContainerContent[], additions: ContainerContent[]): void {
 		for (const addition of additions) {
 			const normalizedItemId = this.contentItemKind(addition.itemId);
@@ -1129,6 +1154,7 @@ export class GameRoom extends DurableObject {
 			chat: { max: 4, windowMs: 5000 },
 			take_item: { max: 10, windowMs: 3000 },
 			place_item: { max: 10, windowMs: 3000 },
+			use_held_on_item: { max: 12, windowMs: 3000 },
 			weigh_item: { max: 10, windowMs: 3000 },
 			scoop_sample: { max: 40, windowMs: 3000 },
 			pour_item: { max: 10, windowMs: 3000 },
@@ -1532,6 +1558,78 @@ export class GameRoom extends DurableObject {
 				this.broadcast({ type: "player_hold", playerId, holding: player.state.holding });
 				break;
 			}
+			case "use_held_on_item": {
+				const held = player.state.holding.find((h) => h.itemId === msg.heldItemId);
+				if (!held) {
+					this.sendError(player.ws, "Kamu tidak memegang item itu");
+					break;
+				}
+
+				const obj = this.objects.get(msg.objectId);
+				if (!obj) break;
+				const target = obj.items.find((i) => i.itemId === msg.targetItemId && i.quantity > 0);
+				if (!target) {
+					this.sendError(player.ws, "Target tidak ditemukan");
+					break;
+				}
+
+				const heldKind = this.itemKind(held);
+				const targetMeta = this.ensureLabMeta(target);
+				let handled = false;
+
+				if (
+					held.category === "bahan" &&
+					(held.volumeMl ?? 0) > 0 &&
+					this.isContainer(target) &&
+					this.isItemKind(target, "tabung-reaksi") &&
+					(heldKind === "hcl" || heldKind === "bacl2")
+				) {
+					const currentVolumeInTarget = this.getContentsVolume(target.contents);
+					const remainingCapacity = Math.max(0, (target.maxVolumeMl ?? 0) - currentVolumeInTarget);
+					const transferMl = this.round4(Math.min(1, held.volumeMl ?? 0, remainingCapacity));
+					if (transferMl <= 0) {
+						this.sendError(player.ws, "Wadah sudah penuh");
+						break;
+					}
+
+					held.volumeMl = this.round4((held.volumeMl ?? 0) - transferMl);
+					if (held.volumeMl <= 0.0001) held.volumeMl = 0;
+					this.upsertLiquid(target, held.itemId, held.name, transferMl);
+
+					if (heldKind === "hcl") targetMeta.sulfateTestHclAdded = true;
+					if (heldKind === "bacl2") targetMeta.sulfateTestBaCl2Added = true;
+					await this.completeSulfateTestIfReady(playerId, target);
+
+					handled = true;
+				}
+
+				if (heldKind === "kertas-lakmus" && this.isContainer(target)) {
+					if (targetMeta.precipitated && targetMeta.stirred) {
+						targetMeta.precipitationChecked = true;
+						await this.completeMilestone(
+							playerId,
+							6,
+							"Kertas lakmus merah berubah biru: larutan sudah basa dan pengendapan dinyatakan sempurna",
+						);
+						handled = true;
+					} else if (targetMeta.washed) {
+						targetMeta.baseTested = true;
+						await this.completeMilestone(playerId, 10, "Uji basa dengan lakmus selesai");
+						handled = true;
+					}
+				}
+
+				if (!handled) {
+					this.sendError(player.ws, "Item ini belum bisa dipakai langsung ke target itu");
+					break;
+				}
+
+				this.persistPlayerState(player.ws, player.state);
+				await this.persistState();
+				this.broadcast({ type: "object_items_changed", objectId: msg.objectId, items: obj.items });
+				this.broadcast({ type: "player_hold", playerId, holding: player.state.holding });
+				break;
+			}
 			case "weigh_item": {
 				const ok = await this.applyWeighTransfer(playerId, player, msg.transferGrams);
 				if (!ok) break;
@@ -1728,9 +1826,7 @@ export class GameRoom extends DurableObject {
 				if (this.isItemKind(target, "tabung-reaksi")) {
 					if (this.isItemKind(source, "hcl")) targetMeta.sulfateTestHclAdded = true;
 					if (this.isItemKind(source, "bacl2")) targetMeta.sulfateTestBaCl2Added = true;
-					if (targetMeta.fromFiltrate && targetMeta.sulfateTestHclAdded && targetMeta.sulfateTestBaCl2Added) {
-						await this.completeMilestone(playerId, 9, "Uji sulfat selesai dengan HCl dan BaCl2");
-					}
+					await this.completeSulfateTestIfReady(playerId, target);
 				}
 
 				await this.persistState();
@@ -1987,13 +2083,7 @@ export class GameRoom extends DurableObject {
 				}
 
 				if (this.isItemKind(setupOther, "tabung-reaksi") && setupMeta.setupReceiverAttached && setupMeta.setupReceiverFromFiltrate) {
-					const srcLiquid = (setupMeta.setupReceiverContents ?? []).find((c) => (c.volumeMl ?? 0) > 0);
-					if (srcLiquid && (srcLiquid.volumeMl ?? 0) > 0) {
-						const transfer = Math.min(5, srcLiquid.volumeMl ?? 0);
-						srcLiquid.volumeMl = this.round4((srcLiquid.volumeMl ?? 0) - transfer);
-						if ((srcLiquid.volumeMl ?? 0) <= 0.0001) srcLiquid.volumeMl = 0;
-						this.upsertLiquid(setupOther, srcLiquid.itemId, srcLiquid.name, transfer);
-						this.ensureLabMeta(setupOther).fromFiltrate = true;
+					if (this.transferFiltrateAliquot(setupMeta.setupReceiverContents, setupOther)) {
 						return true;
 					}
 				}
@@ -2011,12 +2101,7 @@ export class GameRoom extends DurableObject {
 					: null;
 			const target = this.isItemKind(containerA, "tabung-reaksi") ? containerA : this.isItemKind(containerB, "tabung-reaksi") ? containerB : null;
 			if (source && target) {
-				const srcLiquid = (source.contents ?? []).find((c) => (c.volumeMl ?? 0) > 0);
-				if (srcLiquid && (srcLiquid.volumeMl ?? 0) > 0) {
-					const transfer = Math.min(5, srcLiquid.volumeMl ?? 0);
-					srcLiquid.volumeMl = this.round4((srcLiquid.volumeMl ?? 0) - transfer);
-					this.upsertLiquid(target, srcLiquid.itemId, srcLiquid.name, transfer);
-					this.ensureLabMeta(target).fromFiltrate = true;
+				if (this.transferFiltrateAliquot(source.contents, target)) {
 					return true;
 				}
 			}
@@ -2053,7 +2138,11 @@ export class GameRoom extends DurableObject {
 			if (this.isItemKind(toolItem, "kertas-lakmus")) {
 				if (meta.precipitated && meta.stirred) {
 					meta.precipitationChecked = true;
-					await this.completeMilestone(playerId, 6, "Pengendapan sempurna terverifikasi");
+					await this.completeMilestone(
+						playerId,
+						6,
+						"Kertas lakmus merah berubah biru: larutan sudah basa dan pengendapan dinyatakan sempurna",
+					);
 					return true;
 				}
 				if (meta.washed) {

@@ -23,6 +23,7 @@ export function formatInfo(item: InventoryItem | HeldItem): string {
 	if (item.labMeta?.precipitated) parts.push("mengendap");
 	if (item.labMeta?.filtered) parts.push("tersaring");
 	if (item.labMeta?.washed) parts.push("dicuci");
+	if (item.labMeta?.fromFiltrate) parts.push("filtrat cucian");
 	if (item.labMeta?.dried) parts.push("kering");
 	if (item.labMeta?.calcined) parts.push("dipijar");
 	if (item.labMeta?.cooled) parts.push("didinginkan");

@@ -42,6 +42,7 @@ const ITEM_EMOJI: Record<string, string> = {
 	"kertas-saring": "📄", erlenmeyer: "🧪", "tabung-reaksi": "🧫", "kertas-lakmus": "📏",
 	"krus-porselen": "🏺", "kaca-arloji": "⏺", terusi: "💎", "air-suling": "💧",
 	h2so4: "⚗️", naoh: "⚗️", bacl2: "⚗️", hcl: "⚗️",
+	"filtrat-cucian": "💧",
 	"oven-lab": "♨️", "furnace-lab": "🔥", desikator: "🧊", "cuo-hasil-pijar": "⚫",
 };
 
@@ -332,7 +333,38 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 			}
 		}
 
-		if (source === "hand" && (overType === "workspace" || overType === "workspace-item")) {
+		if (source === "hand" && overType === "workspace-item" && overItemId) {
+			const heldItem = holding.find((h) => h.itemId === dragItemId);
+			const targetItem = items.find((i) => i.itemId === overItemId && i.quantity > 0);
+			const heldKind = heldItem ? getItemKind(heldItem) : "";
+			const canUseHeldOnTarget = Boolean(
+				heldItem &&
+					targetItem &&
+					targetItem.category === "alat" &&
+					targetItem.maxVolumeMl !== undefined &&
+					(
+						(
+							heldItem.category === "bahan" &&
+							(heldItem.volumeMl ?? 0) > 0 &&
+							(heldKind === "hcl" || heldKind === "bacl2") &&
+							getItemKind(targetItem) === "tabung-reaksi"
+						) ||
+						heldKind === "kertas-lakmus"
+					),
+			);
+
+			if (canUseHeldOnTarget) {
+				gameClient.send({
+					type: "use_held_on_item",
+					objectId,
+					heldItemId: dragItemId,
+					targetItemId: overItemId,
+				});
+				return;
+			}
+
+			gameClient.send({ type: "place_item", objectId, itemId: dragItemId });
+		} else if (source === "hand" && overType === "workspace") {
 			gameClient.send({ type: "place_item", objectId, itemId: dragItemId });
 		} else if (source === "workspace" && overType === "hand") {
 			gameClient.send({ type: "take_item", objectId, itemId: dragItemId });
@@ -452,7 +484,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 			<DndContext sensors={sensors} collisionDetection={workbenchCollisionDetection} onDragEnd={handleDragEnd}>
 				<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ touchAction: "none" }}>
 					<div
-						className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex flex-col"
+						className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex min-h-0 flex-col"
 						style={{ height: "min(70dvh, 640px)", maxHeight: "calc(100dvh - 2rem)" }}
 					>
 						{/* Handle */}
@@ -469,7 +501,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 						{/* Workspace */}
 						<div
 							ref={setWorkspaceNodeRef}
-							className={`flex-1 mx-4 mb-2 rounded-2xl border-2 border-dashed relative select-none transition-colors ${isOverWorkspace ? "bg-blue-50 border-blue-300" : "bg-neutral-50 border-neutral-200"}`}
+							className={`mx-4 mb-2 min-h-[160px] flex-1 overflow-y-auto rounded-2xl border-2 border-dashed relative select-none transition-colors ${isOverWorkspace ? "bg-blue-50 border-blue-300" : "bg-neutral-50 border-neutral-200"}`}
 						>
 							{workspaceItems.length === 0 && (
 								<p className="absolute inset-0 flex items-center justify-center text-sm text-neutral-300">
@@ -514,7 +546,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 						{/* Disposal zone */}
 						<div
 							ref={setDisposalNodeRef}
-							className={`mx-4 mb-2 rounded-xl border-2 border-dashed px-3 py-2 transition-colors ${isOverDisposal ? "border-rose-400 bg-rose-50" : "border-rose-200 bg-rose-50/40"}`}
+							className={`mx-4 mb-2 shrink-0 rounded-xl border-2 border-dashed px-3 py-2 transition-colors ${isOverDisposal ? "border-rose-400 bg-rose-50" : "border-rose-200 bg-rose-50/40"}`}
 						>
 							<p className="text-sm font-semibold text-rose-700">🗑️ Pembuangan</p>
 							<p className="text-[11px] text-rose-500">Drag wadah ke sini untuk mengosongkan isi (padatan/larutan)</p>
@@ -523,7 +555,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 						{/* Hand tray */}
 						<div
 							ref={setHandNodeRef}
-							className={`mx-4 mb-4 p-3 rounded-2xl border-2 flex gap-2 min-h-[88px] select-none transition-colors ${isOverHand ? "bg-amber-100 border-amber-400" : "bg-amber-50 border-amber-200"}`}
+							className={`mx-4 mb-4 p-3 rounded-2xl border-2 flex shrink-0 gap-2 min-h-[88px] select-none overflow-x-auto transition-colors ${isOverHand ? "bg-amber-100 border-amber-400" : "bg-amber-50 border-amber-200"}`}
 						>
 							<div className="text-xs text-amber-400 self-center mr-1 shrink-0">🤲</div>
 							{holding.length === 0 && <p className="text-xs text-amber-300 self-center">Tangan kosong</p>}
