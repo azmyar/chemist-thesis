@@ -46,7 +46,7 @@ const LEVEL_MILESTONES = [
 	"Timbang terusi ±0,5g ke kaca arloji",
 	"Larutkan terusi dengan 100mL air suling di piala gelas",
 	"Tambahkan H2SO4 4N sampai larutan biru jernih",
-	"Didihkan larutan di hot plate",
+	"Didihkan larutan di teklu",
 	"Endapkan dengan NaOH 4N sambil diaduk",
 	"Uji pengendapan sempurna",
 	"Saring endapan lewat setup corong + kertas saring + piala penampung",
@@ -106,14 +106,14 @@ const CONCEPT_FEEDBACK: Record<string, ConceptFeedback> = {
 		code: "boil.no_acidify",
 		title: "Asamkan sebelum pendidihan",
 		why: "Tanpa H2SO4 sebelum pendidihan, Cu2+ dapat terhidrolisis menjadi Cu(OH)2 koloid yang halus dan sulit disaring.",
-		correction: "Tambahkan H2SO4 4N sampai larutan diasamkan, baru didihkan di hot plate.",
+		correction: "Tambahkan H2SO4 4N sampai larutan diasamkan, baru didihkan di teklu.",
 		relatedConcept: "Urutan pengasaman-pendidihan-pengendapan",
 		blocking: true,
 	},
 	"acidify.insufficient": {
 		code: "acidify.insufficient",
 		title: "H2SO4 belum cukup",
-		why: "Pengasaman diperlukan untuk mencegah hidrolisis Cu2+ sebelum pendidihan. Larutan harus benar-benar diasamkan sebelum masuk ke hot plate.",
+		why: "Pengasaman diperlukan untuk mencegah hidrolisis Cu2+ sebelum pendidihan. Larutan harus benar-benar diasamkan sebelum dipanaskan dengan teklu.",
 		correction: "Tambahkan H2SO4 4N lagi sampai minimal 1 mL total, lalu lanjutkan pendidihan.",
 		relatedConcept: "Pengasaman pra-pendidihan",
 		blocking: true,
@@ -122,7 +122,7 @@ const CONCEPT_FEEDBACK: Record<string, ConceptFeedback> = {
 		code: "precipitate.before_boil",
 		title: "Didihkan larutan sebelum pengendapan",
 		why: "Pengendapan dilakukan dalam kondisi panas agar Cu(OH)2 yang terbentuk terurai menjadi CuO yang lebih stabil, kasar, dan mudah disaring.",
-		correction: "Asamkan larutan, didihkan di hot plate, lalu tambahkan pengendap sedikit demi sedikit.",
+		correction: "Asamkan larutan, didihkan di teklu, lalu tambahkan pengendap sedikit demi sedikit.",
 		relatedConcept: "Pembentukan endapan gravimetri yang baik",
 		blocking: true,
 	},
@@ -282,6 +282,10 @@ export class GameRoom extends DurableObject {
 			shouldPersist = true;
 		}
 
+		if (this.normalizeToolDisplayNames()) {
+			shouldPersist = true;
+		}
+
 		// Migration: append reagent variants introduced in later versions to
 		// existing rooms so persisted state doesn't lock students to an old
 		// reagent set.
@@ -381,7 +385,7 @@ export class GameRoom extends DurableObject {
 			items: [
 				{ itemId: "piala-gelas", name: "Piala Gelas", category: "alat", quantity: 2, maxVolumeMl: 250, contents: [] },
 				{ itemId: "pengaduk-kaca", name: "Pengaduk Kaca", category: "alat", quantity: 1 },
-				{ itemId: "hot-plate", name: "Hot Plate", category: "alat", quantity: 1 },
+				{ itemId: "hot-plate", name: "Teklu", category: "alat", quantity: 1 },
 				{ itemId: "corong-stand", name: "Corong + Stand", category: "alat", quantity: 1 },
 				{ itemId: "kertas-saring", name: "Kertas Saring Whatman", category: "alat", quantity: 3, maxVolumeMl: 20, contents: [] },
 				{ itemId: "erlenmeyer", name: "Erlenmeyer", category: "alat", quantity: 1, maxVolumeMl: 250, contents: [] },
@@ -433,6 +437,19 @@ export class GameRoom extends DurableObject {
 			if (!exists) {
 				table.items.push(item);
 				changed = true;
+			}
+		}
+		return changed;
+	}
+
+	private normalizeToolDisplayNames(): boolean {
+		let changed = false;
+		for (const obj of this.objects.values()) {
+			for (const item of obj.items) {
+				if (this.itemKind(item) === "hot-plate" && item.name !== "Teklu") {
+					item.name = "Teklu";
+					changed = true;
+				}
 			}
 		}
 		return changed;
@@ -2023,7 +2040,7 @@ export class GameRoom extends DurableObject {
 				this.logDecision(container, "boil.preAcidified", true);
 				this.clearIssue(container, "boil.no_acidify");
 
-				await this.completeMilestone(playerId, 4, "Larutan dididihkan di hot plate");
+				await this.completeMilestone(playerId, 4, "Larutan dididihkan di teklu");
 				return true;
 			}
 
