@@ -4,6 +4,7 @@ import { GameRoom } from "./rooms/GameRoom";
 
 // Re-export DO class so Wrangler can find it
 export { GameRoom };
+export class GameRoomV2 extends GameRoom {}
 
 type Env = {
 	GAME_ROOM: DurableObjectNamespace;
