@@ -670,6 +670,11 @@ export class LabScene extends Phaser.Scene {
 							.setPosition(p.x, p.y - 20);
 						this.holdingTag.setPosition(p.x, p.y + 14);
 						this.updateLocalHolding(p.holding);
+						window.dispatchEvent(
+							new CustomEvent("local-hold-changed", {
+								detail: { holding: p.holding },
+							}),
+						);
 						// Snap camera to player immediately (no lerp delay)
 						this.cameras.main.centerOn(p.x, p.y);
 						continue;
@@ -782,6 +787,14 @@ export class LabScene extends Phaser.Scene {
 				window.dispatchEvent(
 					new CustomEvent("level-report", {
 						detail: msg.report,
+					}),
+				);
+				break;
+			}
+			case "concept_feedback": {
+				window.dispatchEvent(
+					new CustomEvent("concept-feedback", {
+						detail: msg.feedback,
 					}),
 				);
 				break;

@@ -310,13 +310,12 @@ export function ObjectSheet() {
 													<span className="font-mono font-semibold">
 														{alreadyInContainerG.toFixed(4)} g
 													</span>{" "}
-													di luar rentang standar. Masih bisa lanjut — konsekuensi akan tercatat di laporan akhir.
+													di luar rentang standar. Tahap berikutnya akan terkunci sampai massa diperbaiki.
 												</p>
 											)}
 											{nonCanonicalContainer && (
 												<p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-													Konvensi: penimbangan sampel dilakukan pada kaca arloji. Menimbang ke{" "}
-													{heldContainer!.name} dibolehkan, tetapi dicatat sebagai deviasi teknik.
+													Penimbangan sampel harus dilakukan pada kaca arloji sebelum masuk ke tahap pelarutan.
 												</p>
 											)}
 										</div>

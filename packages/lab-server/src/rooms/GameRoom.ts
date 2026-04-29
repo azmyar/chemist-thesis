@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
 	type ClientMessage,
+	type ConceptFeedback,
 	type ContainerContent,
 	type DecisionValue,
 	type Direction,
@@ -59,6 +60,129 @@ const LEVEL_MILESTONES = [
 ] as const;
 
 const STEP_XP = [60, 80, 70, 60, 90, 70, 100, 80, 90, 60, 80, 120, 80, 140] as const;
+
+const CONCEPT_FEEDBACK: Record<string, ConceptFeedback> = {
+	"weigh.non_canonical_container": {
+		code: "weigh.non_canonical_container",
+		title: "Gunakan kaca arloji untuk penimbangan",
+		why: "Sampel terusi ditimbang pada kaca arloji agar massa yang diambil stabil, mudah dipindahkan, dan tidak langsung bercampur dengan wadah reaksi.",
+		correction: "Ambil Kaca Arloji, pegang bersama Terusi, lalu timbang ulang sampai 0,45-0,55 g.",
+		relatedConcept: "Teknik penimbangan analitik",
+		blocking: true,
+	},
+	"weigh.too_much": {
+		code: "weigh.too_much",
+		title: "Massa sampel melewati rentang kerja",
+		why: "Rentang kerja penetapan ini adalah sekitar 0,5 g. Sampel terlalu besar meningkatkan risiko endapan tidak tertangani sempurna dan massa residu keluar dari kondisi ideal.",
+		correction: "Kosongkan wadah, lalu ulangi penimbangan sampai berada pada 0,45-0,55 g.",
+		relatedConcept: "Akurasi dan presisi gravimetri",
+		blocking: true,
+	},
+	"weigh.not_ready": {
+		code: "weigh.not_ready",
+		title: "Massa sampel belum memenuhi rentang kerja",
+		why: "Sebelum dilarutkan, massa terusi harus sudah berada pada rentang kerja supaya perhitungan kadar Cu valid.",
+		correction: "Kembali ke timbangan dan tambah sampel sampai 0,45-0,55 g.",
+		relatedConcept: "Akurasi dan presisi gravimetri",
+		blocking: true,
+	},
+	"dissolve.wrong_container": {
+		code: "dissolve.wrong_container",
+		title: "Pelarutan dilakukan di piala gelas",
+		why: "Prosedur penetapan menggunakan piala gelas karena tahap berikutnya membutuhkan penambahan asam, pendidihan, pengendapan, dan pengadukan dalam volume larutan sekitar 100 mL.",
+		correction: "Siapkan Piala Gelas berisi air suling, lalu larutkan sampel terusi di sana.",
+		relatedConcept: "Pelarutan sampel gravimetri",
+		blocking: true,
+	},
+	"dissolve.water_volume": {
+		code: "dissolve.water_volume",
+		title: "Volume air suling harus sekitar 100 mL",
+		why: "Sampel terusi dilarutkan hingga sekitar 100 mL supaya Cu2+ terlarut merata dan siap diendapkan secara terkendali.",
+		correction: "Tambahkan air suling sampai volume berada pada 90-120 mL, lalu lakukan pelarutan.",
+		relatedConcept: "Pelarutan dan konsentrasi larutan induk",
+		blocking: true,
+	},
+	"boil.no_acidify": {
+		code: "boil.no_acidify",
+		title: "Asamkan sebelum pendidihan",
+		why: "Tanpa H2SO4 sebelum pendidihan, Cu2+ dapat terhidrolisis menjadi Cu(OH)2 koloid yang halus dan sulit disaring.",
+		correction: "Tambahkan H2SO4 4N sampai larutan diasamkan, baru didihkan di hot plate.",
+		relatedConcept: "Urutan pengasaman-pendidihan-pengendapan",
+		blocking: true,
+	},
+	"acidify.insufficient": {
+		code: "acidify.insufficient",
+		title: "H2SO4 belum cukup",
+		why: "Pengasaman diperlukan untuk mencegah hidrolisis Cu2+ sebelum pendidihan. Larutan harus benar-benar diasamkan sebelum masuk ke hot plate.",
+		correction: "Tambahkan H2SO4 4N lagi sampai minimal 1 mL total, lalu lanjutkan pendidihan.",
+		relatedConcept: "Pengasaman pra-pendidihan",
+		blocking: true,
+	},
+	"precipitate.before_boil": {
+		code: "precipitate.before_boil",
+		title: "Didihkan larutan sebelum pengendapan",
+		why: "Pengendapan dilakukan dalam kondisi panas agar Cu(OH)2 yang terbentuk terurai menjadi CuO yang lebih stabil, kasar, dan mudah disaring.",
+		correction: "Asamkan larutan, didihkan di hot plate, lalu tambahkan pengendap sedikit demi sedikit.",
+		relatedConcept: "Pembentukan endapan gravimetri yang baik",
+		blocking: true,
+	},
+	"precipitate.nh4oh_complex": {
+		code: "precipitate.nh4oh_complex",
+		title: "NH4OH tidak dipakai sebagai pengendap",
+		why: "Amonia berlebih membentuk kompleks tetraamintembaga(II) yang larut, sehingga Cu2+ tidak mengendap sempurna.",
+		correction: "Gunakan NaOH sebagai pereaksi pengendap, bukan NH4OH.",
+		relatedConcept: "Kompleksasi vs pengendapan hidroksida",
+		blocking: true,
+	},
+	"precipitate.koh_residue": {
+		code: "precipitate.koh_residue",
+		title: "Gunakan NaOH, bukan KOH",
+		why: "KOH memang basa kuat, tetapi sisa kalium yang tidak tercuci dapat meninggalkan residu pijar dan membuat massa hasil terlalu besar.",
+		correction: "Pilih NaOH sebagai pereaksi pengendap untuk penetapan ini.",
+		relatedConcept: "Pemilihan pereaksi pengendap",
+		blocking: true,
+	},
+	"precipitate.too_concentrated": {
+		code: "precipitate.too_concentrated",
+		title: "NaOH terlalu pekat",
+		why: "NaOH yang terlalu pekat menimbulkan supersaturasi lokal sehingga endapan menjadi halus/koloid dan mudah lolos saat penyaringan.",
+		correction: "Gunakan NaOH standar pada praktikum ini dan tambahkan perlahan.",
+		relatedConcept: "Ukuran partikel endapan",
+		blocking: true,
+	},
+	"precipitate.rapid_addition": {
+		code: "precipitate.rapid_addition",
+		title: "Tambahkan pengendap sedikit demi sedikit",
+		why: "Penambahan sekaligus menghasilkan endapan halus. Endapan gravimetri yang baik harus kasar, berat, dan cepat mengendap.",
+		correction: "Tuang NaOH dalam porsi kecil, kurang dari 5 mL per penambahan, sambil diaduk.",
+		relatedConcept: "Teknik penambahan pengendap",
+		blocking: true,
+	},
+	"filter.before_check": {
+		code: "filter.before_check",
+		title: "Uji pengendapan sempurna dulu",
+		why: "Penyaringan hanya valid setelah seluruh Cu2+ dipastikan sudah mengendap. Jika belum, sebagian Cu tetap berada di filtrat dan kadar menjadi rendah.",
+		correction: "Gunakan kertas lakmus atau uji tambahan pengendap sampai pengendapan dinyatakan sempurna, baru saring.",
+		relatedConcept: "Uji pengendapan sempurna",
+		blocking: true,
+	},
+	"dry.before_wash_test": {
+		code: "dry.before_wash_test",
+		title: "Cuci dan uji filtrat sebelum pengeringan",
+		why: "Sulfat dan kelebihan basa tidak hilang saat pemijaran. Jika belum dicuci dan diuji, pengotor dapat menambah massa residu.",
+		correction: "Cuci endapan dengan air suling, lakukan uji sulfat dan uji basa, lalu keringkan di oven.",
+		relatedConcept: "Pencucian endapan gravimetri",
+		blocking: true,
+	},
+	"furnace.before_dry": {
+		code: "furnace.before_dry",
+		title: "Keringkan endapan sebelum pemijaran",
+		why: "Endapan dan kertas saring perlu dikeringkan dahulu agar pemijaran berlangsung stabil dan massa akhir lebih dapat dipercaya.",
+		correction: "Masukkan endapan ke oven pengering sebelum dipijarkan di furnace.",
+		relatedConcept: "Pengeringan dan pemijaran",
+		blocking: true,
+	},
+};
 
 type ContainerLike = InventoryItem | HeldItem;
 
@@ -733,6 +857,10 @@ export class GameRoom extends DurableObject {
 		if (!sourceMeta.precipitated) {
 			return false;
 		}
+		if (!sourceMeta.precipitationChecked) {
+			this.sendConceptFeedback(playerId, "filter.before_check");
+			return true;
+		}
 
 		const liquids = this.cloneContents((sourceItem.contents ?? []).filter((c) => (c.volumeMl ?? 0) > 0));
 		const solids = this.cloneContents((sourceItem.contents ?? []).filter((c) => (c.weightGrams ?? 0) > 0));
@@ -757,7 +885,16 @@ export class GameRoom extends DurableObject {
 
 		setupItem.contents = solids;
 		setupMeta.sampleTerusiG = sourceMeta.sampleTerusiG;
+		setupMeta.decisions = sourceMeta.decisions ? { ...sourceMeta.decisions } : setupMeta.decisions;
+		setupMeta.outcomes = sourceMeta.outcomes
+			? {
+				...sourceMeta.outcomes,
+				issues: sourceMeta.outcomes.issues ? [...sourceMeta.outcomes.issues] : undefined,
+			}
+			: setupMeta.outcomes;
 		setupMeta.precipitated = true;
+		setupMeta.stirred = sourceMeta.stirred;
+		setupMeta.precipitationChecked = sourceMeta.precipitationChecked;
 		setupMeta.filtered = true;
 		sourceItem.contents = [];
 		sourceMeta.filtered = true;
@@ -781,7 +918,15 @@ export class GameRoom extends DurableObject {
 				precipitated: true,
 				filtered: true,
 				washed: setupMeta.washed,
+				baseTested: setupMeta.baseTested,
 				sampleTerusiG: setupMeta.sampleTerusiG,
+				decisions: setupMeta.decisions ? { ...setupMeta.decisions } : undefined,
+				outcomes: setupMeta.outcomes
+					? {
+						...setupMeta.outcomes,
+						issues: setupMeta.outcomes.issues ? [...setupMeta.outcomes.issues] : undefined,
+					}
+					: undefined,
 			},
 		};
 
@@ -905,6 +1050,17 @@ export class GameRoom extends DurableObject {
 		} catch {
 			// player may have disconnected; ignore
 		}
+	}
+
+	private sendConceptFeedback(playerId: string, code: string): void {
+		const feedback = CONCEPT_FEEDBACK[code];
+		if (!feedback) return;
+		this.sendTo(playerId, { type: "concept_feedback", feedback });
+	}
+
+	private blockWithConcept(playerId: string, code: string): false {
+		this.sendConceptFeedback(playerId, code);
+		return false;
 	}
 
 	private checkRateLimit(playerId: string, type: ClientMessage["type"]): boolean {
@@ -1089,6 +1245,19 @@ export class GameRoom extends DurableObject {
 			return false;
 		}
 
+		if (this.isItemKind(bahan, "terusi")) {
+			const containerKind = this.itemKind(container);
+			if (containerKind !== "kaca-arloji") {
+				return this.blockWithConcept(playerId, "weigh.non_canonical_container");
+			}
+
+			const currentSample = container.labMeta?.sampleTerusiG ?? this.getSolidWeight(container, "terusi");
+			const nextSample = this.round4(currentSample + transferGrams);
+			if (nextSample > 0.55) {
+				return this.blockWithConcept(playerId, "weigh.too_much");
+			}
+		}
+
 		bahan.weightGrams = this.round4((bahan.weightGrams ?? 0) - transferGrams);
 		if (!container.contents) container.contents = [];
 		const bahanKind = this.itemKind(bahan);
@@ -1110,23 +1279,13 @@ export class GameRoom extends DurableObject {
 			this.logDecision(container, "weigh.container", containerKind);
 
 			const inRange = sample >= 0.45 && sample <= 0.55;
-			if (inRange) {
-				this.clearIssue(container, "weigh.out_of_range");
-			} else {
-				this.logIssue(container, "weigh.out_of_range");
-			}
-
-			const canonicalContainer = containerKind === "kaca-arloji";
-			if (canonicalContainer) {
-				this.clearIssue(container, "weigh.non_canonical_container");
-			} else {
-				this.logIssue(container, "weigh.non_canonical_container");
-			}
+			if (inRange) this.clearIssue(container, "weigh.out_of_range");
+			this.clearIssue(container, "weigh.non_canonical_container");
 
 			const detailParts = [`Sampel terusi ditimbang ${sample}g`];
-			if (!inRange) detailParts.push("di luar rentang standar");
-			if (!canonicalContainer) detailParts.push(`ke ${container.name}`);
-			await this.completeMilestone(playerId, 1, detailParts.join(" · "));
+			if (inRange) {
+				await this.completeMilestone(playerId, 1, detailParts.join(" · "));
+			}
 		}
 
 		if (bahan.weightGrams <= 0) {
@@ -1243,6 +1402,20 @@ export class GameRoom extends DurableObject {
 				if ((destObj.objectType === "oven" || destObj.objectType === "furnace") && destObj.items.some((i) => i.quantity > 0 && this.itemKind(i) !== heldKind)) {
 					this.sendError(player.ws, "Station ini sedang digunakan wadah lain");
 					break;
+				}
+				if (destObj.objectType === "oven" && this.isContainer(held)) {
+					const meta = held.labMeta ?? {};
+					if (!meta.washed || !this.isMilestoneDone(playerId, 9) || !this.isMilestoneDone(playerId, 10)) {
+						this.blockWithConcept(playerId, "dry.before_wash_test");
+						break;
+					}
+				}
+				if (destObj.objectType === "furnace" && this.isContainer(held)) {
+					const meta = held.labMeta ?? {};
+					if (!meta.dried) {
+						this.blockWithConcept(playerId, "furnace.before_dry");
+						break;
+					}
 				}
 
 				let placedItem: InventoryItem;
@@ -1369,34 +1542,7 @@ export class GameRoom extends DurableObject {
 					break;
 				}
 
-				source.volumeMl = this.round4(source.volumeMl - transferMl);
-				if (source.volumeMl <= 0.0001) source.volumeMl = 0;
-				this.upsertLiquid(target, source.itemId, source.name, transferMl);
-
 				const targetMeta = this.ensureLabMeta(target);
-				if (this.isItemKind(source, "h2so4") && this.hasDissolvedTerusi(target)) {
-					targetMeta.acidified = true;
-					const cumulativeH2so4 = this.getLiquidVolume(target, "h2so4");
-					this.logDecision(target, "acidify.applied", true);
-					this.logDecision(target, "acidify.h2so4VolumeMl", cumulativeH2so4);
-
-					if (cumulativeH2so4 < 1) {
-						this.logIssue(target, "acidify.insufficient");
-					} else {
-						this.clearIssue(target, "acidify.insufficient");
-					}
-
-					await this.completeMilestone(
-						playerId,
-						3,
-						`Larutan diasamkan dengan ${cumulativeH2so4}mL H2SO4`,
-					);
-				}
-
-				// Pengendap variants — naoh (default 4N), naoh-1n, naoh-8n, koh-4n, nh4oh-4n.
-				// Open-world: any alkaline reagent triggers precipitation logic. Student's
-				// reagent + technique choices are logged; downstream consequences manifest
-				// in applyCalcination.
 				const sourceKind = this.itemKind(source);
 				const isPengendap =
 					sourceKind === "naoh" ||
@@ -1405,6 +1551,64 @@ export class GameRoom extends DurableObject {
 					sourceKind === "koh-4n" ||
 					sourceKind === "nh4oh-4n";
 
+				if (
+					sourceKind !== "air-suling" &&
+					targetMeta.filtered &&
+					this.hasSolid(target, "endapan-cuoh2")
+				) {
+					this.blockWithConcept(playerId, "dry.before_wash_test");
+					break;
+				}
+
+				if (isPengendap && this.hasDissolvedTerusi(target)) {
+					if (!targetMeta.boiled) {
+						this.blockWithConcept(playerId, "precipitate.before_boil");
+						break;
+					}
+					if (sourceKind === "nh4oh-4n") {
+						this.blockWithConcept(playerId, "precipitate.nh4oh_complex");
+						break;
+					}
+					if (sourceKind === "koh-4n") {
+						this.blockWithConcept(playerId, "precipitate.koh_residue");
+						break;
+					}
+					if (sourceKind === "naoh-8n") {
+						this.blockWithConcept(playerId, "precipitate.too_concentrated");
+						break;
+					}
+					if (transferMl >= 5) {
+						this.blockWithConcept(playerId, "precipitate.rapid_addition");
+						break;
+					}
+				}
+
+				source.volumeMl = this.round4(source.volumeMl - transferMl);
+				if (source.volumeMl <= 0.0001) source.volumeMl = 0;
+				this.upsertLiquid(target, source.itemId, source.name, transferMl);
+
+				if (this.isItemKind(source, "h2so4") && this.hasDissolvedTerusi(target)) {
+					targetMeta.acidified = true;
+					const cumulativeH2so4 = this.getLiquidVolume(target, "h2so4");
+					this.logDecision(target, "acidify.applied", true);
+					this.logDecision(target, "acidify.h2so4VolumeMl", cumulativeH2so4);
+
+					if (cumulativeH2so4 < 1) {
+						this.sendConceptFeedback(playerId, "acidify.insufficient");
+					} else {
+						this.clearIssue(target, "acidify.insufficient");
+						await this.completeMilestone(
+							playerId,
+							3,
+							`Larutan diasamkan dengan ${cumulativeH2so4}mL H2SO4`,
+						);
+					}
+				}
+
+				// Pengendap variants — naoh (default 4N), naoh-1n, naoh-8n, koh-4n, nh4oh-4n.
+				// Open-world: any alkaline reagent triggers precipitation logic. Student's
+				// reagent + technique choices are logged; downstream consequences manifest
+				// in applyCalcination.
 				if (isPengendap && this.hasDissolvedTerusi(target)) {
 					const reagentKind =
 						sourceKind === "koh-4n"
@@ -1500,6 +1704,25 @@ export class GameRoom extends DurableObject {
 				if (!hasLiquidInTarget) {
 					this.sendError(player.ws, "Wadah target harus berisi larutan");
 					break;
+				}
+
+				const dissolvingTerusi = sourceSolids.some((c) => this.contentItemKind(c.itemId) === "terusi");
+				if (dissolvingTerusi) {
+					const sourceMeta = this.ensureLabMeta(source);
+					const sampleMass = sourceMeta.sampleTerusiG ?? this.getSolidWeight(source, "terusi");
+					if (sampleMass < 0.45 || sampleMass > 0.55) {
+						this.blockWithConcept(playerId, "weigh.not_ready");
+						break;
+					}
+					if (!this.isItemKind(target, "piala-gelas")) {
+						this.blockWithConcept(playerId, "dissolve.wrong_container");
+						break;
+					}
+					const waterVolumeBeforeDissolve = this.getLiquidVolume(target, "air-suling");
+					if (waterVolumeBeforeDissolve < 90 || waterVolumeBeforeDissolve > 120) {
+						this.blockWithConcept(playerId, "dissolve.water_volume");
+						break;
+					}
 				}
 
 				this.applyDissolve(source, target, sourceSolids);
@@ -1777,23 +2000,19 @@ export class GameRoom extends DurableObject {
 			const meta = this.ensureLabMeta(container);
 
 			if (this.isItemKind(toolItem, "hot-plate") && this.hasDissolvedTerusi(container)) {
-				// Open-world: allow boiling regardless of acidification. Skipping
-				// H2SO4 pre-boil leaves Cu2+ susceptible to hydrolysis into
-				// Cu(OH)2 colloid before NaOH is even introduced (Post #1).
-				meta.boiled = true;
-				this.logDecision(container, "boil.applied", true);
-				this.logDecision(container, "boil.preAcidified", Boolean(meta.acidified));
-
-				if (!meta.acidified) {
-					this.logIssue(container, "boil.no_acidify");
-				} else {
-					this.clearIssue(container, "boil.no_acidify");
+				if (!meta.acidified || this.getLiquidVolume(container, "h2so4") < 1) {
+					this.logDecision(container, "boil.applied", false);
+					this.logDecision(container, "boil.preAcidified", Boolean(meta.acidified));
+					this.blockWithConcept(playerId, meta.acidified ? "acidify.insufficient" : "boil.no_acidify");
+					return true;
 				}
 
-				const detail = meta.acidified
-					? "Larutan dididihkan di hot plate"
-					: "Larutan dididihkan di hot plate tanpa pengasaman H2SO4";
-				await this.completeMilestone(playerId, 4, detail);
+				meta.boiled = true;
+				this.logDecision(container, "boil.applied", true);
+				this.logDecision(container, "boil.preAcidified", true);
+				this.clearIssue(container, "boil.no_acidify");
+
+				await this.completeMilestone(playerId, 4, "Larutan dididihkan di hot plate");
 				return true;
 			}
 
@@ -1817,12 +2036,20 @@ export class GameRoom extends DurableObject {
 			}
 
 			if (this.isItemKind(toolItem, "oven-lab") && (meta.filtered || meta.washed)) {
+				if (!meta.washed || !this.isMilestoneDone(playerId, 9) || !this.isMilestoneDone(playerId, 10)) {
+					this.blockWithConcept(playerId, "dry.before_wash_test");
+					return true;
+				}
 				meta.dried = true;
 				await this.completeMilestone(playerId, 11, "Endapan dikeringkan di oven");
 				return true;
 			}
 
-			if (this.isItemKind(toolItem, "furnace-lab") && (meta.dried || meta.calcined || meta.cooled)) {
+			if (this.isItemKind(toolItem, "furnace-lab") && (meta.filtered || meta.washed || meta.dried || meta.calcined || meta.cooled)) {
+				if (!meta.dried) {
+					this.blockWithConcept(playerId, "furnace.before_dry");
+					return true;
+				}
 				meta.calcined = true;
 				meta.cooled = false;
 				this.applyCalcination(container);

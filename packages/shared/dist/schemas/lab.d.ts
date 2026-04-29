@@ -24,6 +24,23 @@ export declare const containerContentSchema: z.ZodObject<{
     dissolved?: boolean | undefined;
 }>;
 export type ContainerContent = z.infer<typeof containerContentSchema>;
+/**
+ * Decision value stored per container. Flexible key-value so new step handlers
+ * can log context-specific choices without schema migration.
+ */
+export declare const decisionValueSchema: z.ZodUnion<[z.ZodString, z.ZodNumber, z.ZodBoolean]>;
+export type DecisionValue = z.infer<typeof decisionValueSchema>;
+export declare const containerOutcomesSchema: z.ZodObject<{
+    issues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    massErrorG: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    issues?: string[] | undefined;
+    massErrorG?: number | undefined;
+}, {
+    issues?: string[] | undefined;
+    massErrorG?: number | undefined;
+}>;
+export type ContainerOutcomes = z.infer<typeof containerOutcomesSchema>;
 export declare const labContainerMetaSchema: z.ZodObject<{
     sampleTerusiG: z.ZodOptional<z.ZodNumber>;
     acidified: z.ZodOptional<z.ZodBoolean>;
@@ -43,6 +60,42 @@ export declare const labContainerMetaSchema: z.ZodObject<{
     cuoMassG: z.ZodOptional<z.ZodNumber>;
     lastRecordedMassG: z.ZodOptional<z.ZodNumber>;
     reheatedAfterWeigh: z.ZodOptional<z.ZodBoolean>;
+    setupFilterPaperAttached: z.ZodOptional<z.ZodBoolean>;
+    setupReceiverAttached: z.ZodOptional<z.ZodBoolean>;
+    setupReceiverItemId: z.ZodOptional<z.ZodString>;
+    setupReceiverName: z.ZodOptional<z.ZodString>;
+    setupReceiverMaxVolumeMl: z.ZodOptional<z.ZodNumber>;
+    setupReceiverContents: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        itemId: z.ZodString;
+        name: z.ZodString;
+        weightGrams: z.ZodOptional<z.ZodNumber>;
+        volumeMl: z.ZodOptional<z.ZodNumber>;
+        dissolved: z.ZodOptional<z.ZodBoolean>;
+    }, "strip", z.ZodTypeAny, {
+        name: string;
+        itemId: string;
+        weightGrams?: number | undefined;
+        volumeMl?: number | undefined;
+        dissolved?: boolean | undefined;
+    }, {
+        name: string;
+        itemId: string;
+        weightGrams?: number | undefined;
+        volumeMl?: number | undefined;
+        dissolved?: boolean | undefined;
+    }>, "many">>;
+    setupReceiverFromFiltrate: z.ZodOptional<z.ZodBoolean>;
+    decisions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnion<[z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+    outcomes: z.ZodOptional<z.ZodObject<{
+        issues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        massErrorG: z.ZodOptional<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        issues?: string[] | undefined;
+        massErrorG?: number | undefined;
+    }, {
+        issues?: string[] | undefined;
+        massErrorG?: number | undefined;
+    }>>;
 }, "strip", z.ZodTypeAny, {
     sampleTerusiG?: number | undefined;
     acidified?: boolean | undefined;
@@ -62,6 +115,24 @@ export declare const labContainerMetaSchema: z.ZodObject<{
     cuoMassG?: number | undefined;
     lastRecordedMassG?: number | undefined;
     reheatedAfterWeigh?: boolean | undefined;
+    setupFilterPaperAttached?: boolean | undefined;
+    setupReceiverAttached?: boolean | undefined;
+    setupReceiverItemId?: string | undefined;
+    setupReceiverName?: string | undefined;
+    setupReceiverMaxVolumeMl?: number | undefined;
+    setupReceiverContents?: {
+        name: string;
+        itemId: string;
+        weightGrams?: number | undefined;
+        volumeMl?: number | undefined;
+        dissolved?: boolean | undefined;
+    }[] | undefined;
+    setupReceiverFromFiltrate?: boolean | undefined;
+    decisions?: Record<string, string | number | boolean> | undefined;
+    outcomes?: {
+        issues?: string[] | undefined;
+        massErrorG?: number | undefined;
+    } | undefined;
 }, {
     sampleTerusiG?: number | undefined;
     acidified?: boolean | undefined;
@@ -81,10 +152,29 @@ export declare const labContainerMetaSchema: z.ZodObject<{
     cuoMassG?: number | undefined;
     lastRecordedMassG?: number | undefined;
     reheatedAfterWeigh?: boolean | undefined;
+    setupFilterPaperAttached?: boolean | undefined;
+    setupReceiverAttached?: boolean | undefined;
+    setupReceiverItemId?: string | undefined;
+    setupReceiverName?: string | undefined;
+    setupReceiverMaxVolumeMl?: number | undefined;
+    setupReceiverContents?: {
+        name: string;
+        itemId: string;
+        weightGrams?: number | undefined;
+        volumeMl?: number | undefined;
+        dissolved?: boolean | undefined;
+    }[] | undefined;
+    setupReceiverFromFiltrate?: boolean | undefined;
+    decisions?: Record<string, string | number | boolean> | undefined;
+    outcomes?: {
+        issues?: string[] | undefined;
+        massErrorG?: number | undefined;
+    } | undefined;
 }>;
 export type LabContainerMeta = z.infer<typeof labContainerMetaSchema>;
 export declare const inventoryItemSchema: z.ZodObject<{
     itemId: z.ZodString;
+    baseItemId: z.ZodOptional<z.ZodString>;
     name: z.ZodString;
     category: z.ZodEnum<["alat", "bahan"]>;
     quantity: z.ZodNumber;
@@ -129,6 +219,42 @@ export declare const inventoryItemSchema: z.ZodObject<{
         cuoMassG: z.ZodOptional<z.ZodNumber>;
         lastRecordedMassG: z.ZodOptional<z.ZodNumber>;
         reheatedAfterWeigh: z.ZodOptional<z.ZodBoolean>;
+        setupFilterPaperAttached: z.ZodOptional<z.ZodBoolean>;
+        setupReceiverAttached: z.ZodOptional<z.ZodBoolean>;
+        setupReceiverItemId: z.ZodOptional<z.ZodString>;
+        setupReceiverName: z.ZodOptional<z.ZodString>;
+        setupReceiverMaxVolumeMl: z.ZodOptional<z.ZodNumber>;
+        setupReceiverContents: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            itemId: z.ZodString;
+            name: z.ZodString;
+            weightGrams: z.ZodOptional<z.ZodNumber>;
+            volumeMl: z.ZodOptional<z.ZodNumber>;
+            dissolved: z.ZodOptional<z.ZodBoolean>;
+        }, "strip", z.ZodTypeAny, {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }, {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }>, "many">>;
+        setupReceiverFromFiltrate: z.ZodOptional<z.ZodBoolean>;
+        decisions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnion<[z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+        outcomes: z.ZodOptional<z.ZodObject<{
+            issues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+            massErrorG: z.ZodOptional<z.ZodNumber>;
+        }, "strip", z.ZodTypeAny, {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        }, {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        }>>;
     }, "strip", z.ZodTypeAny, {
         sampleTerusiG?: number | undefined;
         acidified?: boolean | undefined;
@@ -148,6 +274,24 @@ export declare const inventoryItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     }, {
         sampleTerusiG?: number | undefined;
         acidified?: boolean | undefined;
@@ -167,6 +311,24 @@ export declare const inventoryItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     }>>;
 }, "strip", z.ZodTypeAny, {
     name: string;
@@ -175,6 +337,7 @@ export declare const inventoryItemSchema: z.ZodObject<{
     quantity: number;
     weightGrams?: number | undefined;
     volumeMl?: number | undefined;
+    baseItemId?: string | undefined;
     maxVolumeMl?: number | undefined;
     contents?: {
         name: string;
@@ -202,6 +365,24 @@ export declare const inventoryItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     } | undefined;
 }, {
     name: string;
@@ -210,6 +391,7 @@ export declare const inventoryItemSchema: z.ZodObject<{
     quantity: number;
     weightGrams?: number | undefined;
     volumeMl?: number | undefined;
+    baseItemId?: string | undefined;
     maxVolumeMl?: number | undefined;
     contents?: {
         name: string;
@@ -237,11 +419,30 @@ export declare const inventoryItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     } | undefined;
 }>;
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 export declare const heldItemSchema: z.ZodObject<{
     itemId: z.ZodString;
+    baseItemId: z.ZodOptional<z.ZodString>;
     name: z.ZodString;
     category: z.ZodEnum<["alat", "bahan"]>;
     weightGrams: z.ZodOptional<z.ZodNumber>;
@@ -285,6 +486,42 @@ export declare const heldItemSchema: z.ZodObject<{
         cuoMassG: z.ZodOptional<z.ZodNumber>;
         lastRecordedMassG: z.ZodOptional<z.ZodNumber>;
         reheatedAfterWeigh: z.ZodOptional<z.ZodBoolean>;
+        setupFilterPaperAttached: z.ZodOptional<z.ZodBoolean>;
+        setupReceiverAttached: z.ZodOptional<z.ZodBoolean>;
+        setupReceiverItemId: z.ZodOptional<z.ZodString>;
+        setupReceiverName: z.ZodOptional<z.ZodString>;
+        setupReceiverMaxVolumeMl: z.ZodOptional<z.ZodNumber>;
+        setupReceiverContents: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            itemId: z.ZodString;
+            name: z.ZodString;
+            weightGrams: z.ZodOptional<z.ZodNumber>;
+            volumeMl: z.ZodOptional<z.ZodNumber>;
+            dissolved: z.ZodOptional<z.ZodBoolean>;
+        }, "strip", z.ZodTypeAny, {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }, {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }>, "many">>;
+        setupReceiverFromFiltrate: z.ZodOptional<z.ZodBoolean>;
+        decisions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnion<[z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+        outcomes: z.ZodOptional<z.ZodObject<{
+            issues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+            massErrorG: z.ZodOptional<z.ZodNumber>;
+        }, "strip", z.ZodTypeAny, {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        }, {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        }>>;
     }, "strip", z.ZodTypeAny, {
         sampleTerusiG?: number | undefined;
         acidified?: boolean | undefined;
@@ -304,6 +541,24 @@ export declare const heldItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     }, {
         sampleTerusiG?: number | undefined;
         acidified?: boolean | undefined;
@@ -323,6 +578,24 @@ export declare const heldItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     }>>;
 }, "strip", z.ZodTypeAny, {
     name: string;
@@ -330,6 +603,7 @@ export declare const heldItemSchema: z.ZodObject<{
     category: "alat" | "bahan";
     weightGrams?: number | undefined;
     volumeMl?: number | undefined;
+    baseItemId?: string | undefined;
     maxVolumeMl?: number | undefined;
     contents?: {
         name: string;
@@ -357,6 +631,24 @@ export declare const heldItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     } | undefined;
 }, {
     name: string;
@@ -364,6 +656,7 @@ export declare const heldItemSchema: z.ZodObject<{
     category: "alat" | "bahan";
     weightGrams?: number | undefined;
     volumeMl?: number | undefined;
+    baseItemId?: string | undefined;
     maxVolumeMl?: number | undefined;
     contents?: {
         name: string;
@@ -391,6 +684,24 @@ export declare const heldItemSchema: z.ZodObject<{
         cuoMassG?: number | undefined;
         lastRecordedMassG?: number | undefined;
         reheatedAfterWeigh?: boolean | undefined;
+        setupFilterPaperAttached?: boolean | undefined;
+        setupReceiverAttached?: boolean | undefined;
+        setupReceiverItemId?: string | undefined;
+        setupReceiverName?: string | undefined;
+        setupReceiverMaxVolumeMl?: number | undefined;
+        setupReceiverContents?: {
+            name: string;
+            itemId: string;
+            weightGrams?: number | undefined;
+            volumeMl?: number | undefined;
+            dissolved?: boolean | undefined;
+        }[] | undefined;
+        setupReceiverFromFiltrate?: boolean | undefined;
+        decisions?: Record<string, string | number | boolean> | undefined;
+        outcomes?: {
+            issues?: string[] | undefined;
+            massErrorG?: number | undefined;
+        } | undefined;
     } | undefined;
 }>;
 export type HeldItem = z.infer<typeof heldItemSchema>;
@@ -473,6 +784,83 @@ export declare const levelStateSchema: z.ZodObject<{
     lastEvent?: string | undefined;
 }>;
 export type LevelState = z.infer<typeof levelStateSchema>;
+export declare const reportIssueSchema: z.ZodObject<{
+    code: z.ZodString;
+    impactMassG: z.ZodNumber;
+    decisionSummary: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    code: string;
+    impactMassG: number;
+    decisionSummary: string;
+}, {
+    code: string;
+    impactMassG: number;
+    decisionSummary: string;
+}>;
+export type ReportIssue = z.infer<typeof reportIssueSchema>;
+export declare const levelReportSchema: z.ZodObject<{
+    levelId: z.ZodString;
+    sampleMassG: z.ZodNumber;
+    cuoMassG: z.ZodNumber;
+    gravimetricFactor: z.ZodNumber;
+    kadarPercent: z.ZodNumber;
+    theoreticalPercent: z.ZodNumber;
+    deviationPercent: z.ZodNumber;
+    issues: z.ZodArray<z.ZodObject<{
+        code: z.ZodString;
+        impactMassG: z.ZodNumber;
+        decisionSummary: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        code: string;
+        impactMassG: number;
+        decisionSummary: string;
+    }, {
+        code: string;
+        impactMassG: number;
+        decisionSummary: string;
+    }>, "many">;
+    decisions: z.ZodRecord<z.ZodString, z.ZodUnion<[z.ZodString, z.ZodNumber, z.ZodBoolean]>>;
+    generatedAt: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    issues: {
+        code: string;
+        impactMassG: number;
+        decisionSummary: string;
+    }[];
+    cuoMassG: number;
+    decisions: Record<string, string | number | boolean>;
+    levelId: string;
+    sampleMassG: number;
+    gravimetricFactor: number;
+    kadarPercent: number;
+    theoreticalPercent: number;
+    deviationPercent: number;
+    generatedAt: number;
+}, {
+    issues: {
+        code: string;
+        impactMassG: number;
+        decisionSummary: string;
+    }[];
+    cuoMassG: number;
+    decisions: Record<string, string | number | boolean>;
+    levelId: string;
+    sampleMassG: number;
+    gravimetricFactor: number;
+    kadarPercent: number;
+    theoreticalPercent: number;
+    deviationPercent: number;
+    generatedAt: number;
+}>;
+export type LevelReport = z.infer<typeof levelReportSchema>;
+export interface ConceptFeedback {
+    code: string;
+    title: string;
+    why: string;
+    correction: string;
+    relatedConcept: string;
+    blocking: boolean;
+}
 export declare const playerStateSchema: z.ZodObject<{
     id: z.ZodString;
     name: z.ZodString;
@@ -483,6 +871,7 @@ export declare const playerStateSchema: z.ZodObject<{
     vy: z.ZodNumber;
     holding: z.ZodArray<z.ZodObject<{
         itemId: z.ZodString;
+        baseItemId: z.ZodOptional<z.ZodString>;
         name: z.ZodString;
         category: z.ZodEnum<["alat", "bahan"]>;
         weightGrams: z.ZodOptional<z.ZodNumber>;
@@ -526,6 +915,42 @@ export declare const playerStateSchema: z.ZodObject<{
             cuoMassG: z.ZodOptional<z.ZodNumber>;
             lastRecordedMassG: z.ZodOptional<z.ZodNumber>;
             reheatedAfterWeigh: z.ZodOptional<z.ZodBoolean>;
+            setupFilterPaperAttached: z.ZodOptional<z.ZodBoolean>;
+            setupReceiverAttached: z.ZodOptional<z.ZodBoolean>;
+            setupReceiverItemId: z.ZodOptional<z.ZodString>;
+            setupReceiverName: z.ZodOptional<z.ZodString>;
+            setupReceiverMaxVolumeMl: z.ZodOptional<z.ZodNumber>;
+            setupReceiverContents: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                itemId: z.ZodString;
+                name: z.ZodString;
+                weightGrams: z.ZodOptional<z.ZodNumber>;
+                volumeMl: z.ZodOptional<z.ZodNumber>;
+                dissolved: z.ZodOptional<z.ZodBoolean>;
+            }, "strip", z.ZodTypeAny, {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }, {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }>, "many">>;
+            setupReceiverFromFiltrate: z.ZodOptional<z.ZodBoolean>;
+            decisions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnion<[z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+            outcomes: z.ZodOptional<z.ZodObject<{
+                issues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+                massErrorG: z.ZodOptional<z.ZodNumber>;
+            }, "strip", z.ZodTypeAny, {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            }, {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            }>>;
         }, "strip", z.ZodTypeAny, {
             sampleTerusiG?: number | undefined;
             acidified?: boolean | undefined;
@@ -545,6 +970,24 @@ export declare const playerStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         }, {
             sampleTerusiG?: number | undefined;
             acidified?: boolean | undefined;
@@ -564,6 +1007,24 @@ export declare const playerStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         }>>;
     }, "strip", z.ZodTypeAny, {
         name: string;
@@ -571,6 +1032,7 @@ export declare const playerStateSchema: z.ZodObject<{
         category: "alat" | "bahan";
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -598,6 +1060,24 @@ export declare const playerStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }, {
         name: string;
@@ -605,6 +1085,7 @@ export declare const playerStateSchema: z.ZodObject<{
         category: "alat" | "bahan";
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -632,6 +1113,24 @@ export declare const playerStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
@@ -648,6 +1147,7 @@ export declare const playerStateSchema: z.ZodObject<{
         category: "alat" | "bahan";
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -675,6 +1175,24 @@ export declare const playerStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }[];
 }, {
@@ -691,6 +1209,7 @@ export declare const playerStateSchema: z.ZodObject<{
         category: "alat" | "bahan";
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -718,17 +1237,36 @@ export declare const playerStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }[];
 }>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
-export declare const gameObjectTypeSchema: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan"]>;
+export declare const gameObjectTypeSchema: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan", "oven", "furnace"]>;
 export type GameObjectType = z.infer<typeof gameObjectTypeSchema>;
 export declare const gameObjectStateSchema: z.ZodObject<{
     id: z.ZodString;
-    objectType: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan"]>;
+    objectType: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan", "oven", "furnace"]>;
     items: z.ZodArray<z.ZodObject<{
         itemId: z.ZodString;
+        baseItemId: z.ZodOptional<z.ZodString>;
         name: z.ZodString;
         category: z.ZodEnum<["alat", "bahan"]>;
         quantity: z.ZodNumber;
@@ -773,6 +1311,42 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             cuoMassG: z.ZodOptional<z.ZodNumber>;
             lastRecordedMassG: z.ZodOptional<z.ZodNumber>;
             reheatedAfterWeigh: z.ZodOptional<z.ZodBoolean>;
+            setupFilterPaperAttached: z.ZodOptional<z.ZodBoolean>;
+            setupReceiverAttached: z.ZodOptional<z.ZodBoolean>;
+            setupReceiverItemId: z.ZodOptional<z.ZodString>;
+            setupReceiverName: z.ZodOptional<z.ZodString>;
+            setupReceiverMaxVolumeMl: z.ZodOptional<z.ZodNumber>;
+            setupReceiverContents: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                itemId: z.ZodString;
+                name: z.ZodString;
+                weightGrams: z.ZodOptional<z.ZodNumber>;
+                volumeMl: z.ZodOptional<z.ZodNumber>;
+                dissolved: z.ZodOptional<z.ZodBoolean>;
+            }, "strip", z.ZodTypeAny, {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }, {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }>, "many">>;
+            setupReceiverFromFiltrate: z.ZodOptional<z.ZodBoolean>;
+            decisions: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnion<[z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+            outcomes: z.ZodOptional<z.ZodObject<{
+                issues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+                massErrorG: z.ZodOptional<z.ZodNumber>;
+            }, "strip", z.ZodTypeAny, {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            }, {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            }>>;
         }, "strip", z.ZodTypeAny, {
             sampleTerusiG?: number | undefined;
             acidified?: boolean | undefined;
@@ -792,6 +1366,24 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         }, {
             sampleTerusiG?: number | undefined;
             acidified?: boolean | undefined;
@@ -811,6 +1403,24 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         }>>;
     }, "strip", z.ZodTypeAny, {
         name: string;
@@ -819,6 +1429,7 @@ export declare const gameObjectStateSchema: z.ZodObject<{
         quantity: number;
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -846,6 +1457,24 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }, {
         name: string;
@@ -854,6 +1483,7 @@ export declare const gameObjectStateSchema: z.ZodObject<{
         quantity: number;
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -881,11 +1511,29 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     id: string;
-    objectType: "workbench" | "storage" | "reagent_table" | "timbangan";
+    objectType: "workbench" | "storage" | "reagent_table" | "timbangan" | "oven" | "furnace";
     items: {
         name: string;
         itemId: string;
@@ -893,6 +1541,7 @@ export declare const gameObjectStateSchema: z.ZodObject<{
         quantity: number;
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -920,11 +1569,29 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }[];
 }, {
     id: string;
-    objectType: "workbench" | "storage" | "reagent_table" | "timbangan";
+    objectType: "workbench" | "storage" | "reagent_table" | "timbangan" | "oven" | "furnace";
     items: {
         name: string;
         itemId: string;
@@ -932,6 +1599,7 @@ export declare const gameObjectStateSchema: z.ZodObject<{
         quantity: number;
         weightGrams?: number | undefined;
         volumeMl?: number | undefined;
+        baseItemId?: string | undefined;
         maxVolumeMl?: number | undefined;
         contents?: {
             name: string;
@@ -959,6 +1627,24 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             cuoMassG?: number | undefined;
             lastRecordedMassG?: number | undefined;
             reheatedAfterWeigh?: boolean | undefined;
+            setupFilterPaperAttached?: boolean | undefined;
+            setupReceiverAttached?: boolean | undefined;
+            setupReceiverItemId?: string | undefined;
+            setupReceiverName?: string | undefined;
+            setupReceiverMaxVolumeMl?: number | undefined;
+            setupReceiverContents?: {
+                name: string;
+                itemId: string;
+                weightGrams?: number | undefined;
+                volumeMl?: number | undefined;
+                dissolved?: boolean | undefined;
+            }[] | undefined;
+            setupReceiverFromFiltrate?: boolean | undefined;
+            decisions?: Record<string, string | number | boolean> | undefined;
+            outcomes?: {
+                issues?: string[] | undefined;
+                massErrorG?: number | undefined;
+            } | undefined;
         } | undefined;
     }[];
 }>;
@@ -1047,6 +1733,18 @@ export declare const clientWeighItemSchema: z.ZodObject<{
     type: "weigh_item";
     transferGrams: number;
 }>;
+/**
+ * Tap-to-scoop weighing. Unlike weigh_item, the client specifies no amount;
+ * the server picks a small random transfer (mimics manual spatula scoop).
+ * Intended for realistic sample weighing on a balance.
+ */
+export declare const clientScoopSampleSchema: z.ZodObject<{
+    type: z.ZodLiteral<"scoop_sample">;
+}, "strip", z.ZodTypeAny, {
+    type: "scoop_sample";
+}, {
+    type: "scoop_sample";
+}>;
 export declare const clientPourItemSchema: z.ZodObject<{
     type: z.ZodLiteral<"pour_item">;
     objectId: z.ZodString;
@@ -1110,6 +1808,47 @@ export declare const clientRecordMassSchema: z.ZodObject<{
     type: "record_mass";
     containerItemId: string;
     measuredMassG: number;
+}>;
+export declare const clientDiscardObjectContentsSchema: z.ZodObject<{
+    type: z.ZodLiteral<"discard_object_contents">;
+    objectId: z.ZodString;
+    itemId: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "discard_object_contents";
+    itemId: string;
+    objectId: string;
+}, {
+    type: "discard_object_contents";
+    itemId: string;
+    objectId: string;
+}>;
+export declare const clientDiscardHeldContentsSchema: z.ZodObject<{
+    type: z.ZodLiteral<"discard_held_contents">;
+    itemId: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "discard_held_contents";
+    itemId: string;
+}, {
+    type: "discard_held_contents";
+    itemId: string;
+}>;
+export declare const setupDetachPartSchema: z.ZodEnum<["filter", "receiver", "all"]>;
+export type SetupDetachPart = z.infer<typeof setupDetachPartSchema>;
+export declare const clientDetachSetupPartSchema: z.ZodObject<{
+    type: z.ZodLiteral<"detach_setup_part">;
+    objectId: z.ZodString;
+    setupItemId: z.ZodString;
+    part: z.ZodEnum<["filter", "receiver", "all"]>;
+}, "strip", z.ZodTypeAny, {
+    type: "detach_setup_part";
+    objectId: string;
+    setupItemId: string;
+    part: "filter" | "receiver" | "all";
+}, {
+    type: "detach_setup_part";
+    objectId: string;
+    setupItemId: string;
+    part: "filter" | "receiver" | "all";
 }>;
 export declare const clientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     type: z.ZodLiteral<"move">;
@@ -1190,6 +1929,12 @@ export declare const clientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.Zod
     type: "weigh_item";
     transferGrams: number;
 }>, z.ZodObject<{
+    type: z.ZodLiteral<"scoop_sample">;
+}, "strip", z.ZodTypeAny, {
+    type: "scoop_sample";
+}, {
+    type: "scoop_sample";
+}>, z.ZodObject<{
     type: z.ZodLiteral<"pour_item">;
     objectId: z.ZodString;
     sourceItemId: z.ZodString;
@@ -1249,6 +1994,42 @@ export declare const clientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.Zod
     type: "record_mass";
     containerItemId: string;
     measuredMassG: number;
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"discard_object_contents">;
+    objectId: z.ZodString;
+    itemId: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "discard_object_contents";
+    itemId: string;
+    objectId: string;
+}, {
+    type: "discard_object_contents";
+    itemId: string;
+    objectId: string;
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"discard_held_contents">;
+    itemId: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "discard_held_contents";
+    itemId: string;
+}, {
+    type: "discard_held_contents";
+    itemId: string;
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"detach_setup_part">;
+    objectId: z.ZodString;
+    setupItemId: z.ZodString;
+    part: z.ZodEnum<["filter", "receiver", "all"]>;
+}, "strip", z.ZodTypeAny, {
+    type: "detach_setup_part";
+    objectId: string;
+    setupItemId: string;
+    part: "filter" | "receiver" | "all";
+}, {
+    type: "detach_setup_part";
+    objectId: string;
+    setupItemId: string;
+    part: "filter" | "receiver" | "all";
 }>]>;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ServerMessage = {
@@ -1280,6 +2061,9 @@ export type ServerMessage = {
     type: "error";
     message: string;
 } | {
+    type: "concept_feedback";
+    feedback: ConceptFeedback;
+} | {
     type: "chat";
     playerId: string;
     playerName: string;
@@ -1295,15 +2079,18 @@ export type ServerMessage = {
 } | {
     type: "level_state";
     level: LevelState;
+} | {
+    type: "level_report";
+    report: LevelReport;
 };
 export declare const ROOM_CONFIG: {
     readonly MAX_PLAYERS: 20;
-    readonly MAP_WIDTH: 1024;
-    readonly MAP_HEIGHT: 768;
+    readonly MAP_WIDTH: 896;
+    readonly MAP_HEIGHT: 672;
     readonly TILE_SIZE: 32;
-    readonly MAP_COLS: 32;
-    readonly MAP_ROWS: 24;
-    readonly PLAYER_SPEED: 80;
+    readonly MAP_COLS: 28;
+    readonly MAP_ROWS: 21;
+    readonly PLAYER_SPEED: 120;
 };
 export declare const joinRoomSchema: z.ZodObject<{
     roomId: z.ZodString;

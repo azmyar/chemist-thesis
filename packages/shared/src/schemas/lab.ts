@@ -152,6 +152,17 @@ export const levelReportSchema = z.object({
 });
 export type LevelReport = z.infer<typeof levelReportSchema>;
 
+// ── Immediate Concept Feedback ───────────────────
+
+export interface ConceptFeedback {
+	code: string;
+	title: string;
+	why: string;
+	correction: string;
+	relatedConcept: string;
+	blocking: boolean;
+}
+
 // ── Player State ──────────────────────────────────
 
 export const playerStateSchema = z.object({
@@ -334,6 +345,10 @@ export type ServerMessage =
 			direction: Direction;
 	  }
 	| { type: "error"; message: string }
+	| {
+			type: "concept_feedback";
+			feedback: ConceptFeedback;
+	  }
 	| { type: "chat"; playerId: string; playerName: string; text: string }
 	| {
 			type: "object_items_changed";
