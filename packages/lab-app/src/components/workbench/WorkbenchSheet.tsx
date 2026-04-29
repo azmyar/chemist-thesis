@@ -75,20 +75,6 @@ function hasLiquidKind(item: InventoryItem | undefined, kind: string): boolean {
 	);
 }
 
-function isSulfateTestReagentKind(kind: string): boolean {
-	return kind === "hcl" || kind === "bacl2";
-}
-
-function isFiltrateTestTube(item: InventoryItem | undefined): boolean {
-	if (!item) return false;
-	if (getItemKind(item) !== "tabung-reaksi") return false;
-	return Boolean(item.labMeta?.fromFiltrate) || hasLiquidKind(item, "filtrat-cucian");
-}
-
-function findFiltrateTestTubeId(items: InventoryItem[]): string | undefined {
-	return items.find((item) => item.quantity > 0 && isFiltrateTestTube(item))?.itemId;
-}
-
 // ── Draggable card — element itself moves (no DragOverlay) ──
 
 function DraggableCard({ id, item, variant, onDetachFilter, onDetachReceiver }: {
@@ -348,21 +334,6 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 		}
 
 		if (!source || !dragItemId || !overType) return;
-
-		const activeHeldItem = source === "hand" ? holding.find((h) => h.itemId === dragItemId) : undefined;
-		const activeKind = activeHeldItem ? getItemKind(activeHeldItem) : kindFromItemId(dragItemId);
-
-		if (
-			isSulfateTestReagentKind(activeKind) &&
-			(!overItemId || !isFiltrateTestTube(items.find((i) => i.itemId === overItemId && i.quantity > 0))) &&
-			(overType === "workspace" || overType === "workspace-item")
-		) {
-			const filtrateTubeId = findFiltrateTestTubeId(items);
-			if (filtrateTubeId) {
-				overItemId = filtrateTubeId;
-				overType = "workspace-item";
-			}
-		}
 
 		if (overType === "disposal") {
 			if (source === "workspace") {
