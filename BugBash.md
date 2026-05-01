@@ -1,0 +1,2 @@
+1. make dropzone on meja kerja exactly like storage bahan and alat. rn when dragging object to tangan dropzone, it drags the object and make the object dropzone scrolled down infinitely (since we drag the object down to the tangan dropzone below it)
+2. 

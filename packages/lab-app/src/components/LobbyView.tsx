@@ -23,6 +23,7 @@ export function LobbyView({ user }: LobbyViewProps) {
 	const router = useRouter();
 	const [joining, setJoining] = useState(false);
 	const [playerName, setPlayerName] = useState(user.profile?.name ?? "Pemain");
+	const [resetting, setResetting] = useState(false);
 
 	const handleJoin = (roomId: string) => {
 		setJoining(true);
@@ -30,10 +31,44 @@ export function LobbyView({ user }: LobbyViewProps) {
 		router.push(`/room/${roomId}?name=${encodedName}`);
 	};
 
+	const handleReset = async () => {
+		if (!confirm("Yakin reset semua progress? Ini tidak bisa dibatalkan.")) return;
+		setResetting(true);
+		try {
+			// Clear client storage
+			localStorage.clear();
+			sessionStorage.clear();
+
+			// Call server reset
+			const res = await fetch("/api/reset-state", { method: "POST" });
+			if (res.ok) {
+				alert("Progress reset berhasil!");
+				window.location.reload();
+			} else {
+				alert("Gagal reset server");
+			}
+		} catch (error) {
+			console.error("Reset error:", error);
+			alert("Gagal reset");
+		} finally {
+			setResetting(false);
+		}
+	};
+
 	return (
 		<div className="min-h-screen bg-neutral-800 flex flex-col items-center justify-center p-6">
 			<div className="max-w-md w-full">
-				<h1 className="title-2 text-neutral-50 mb-2">ChemistLab</h1>
+				<div className="flex items-center justify-between mb-2">
+					<h1 className="title-2 text-neutral-50">ChemistLab</h1>
+					<button
+						type="button"
+						onClick={handleReset}
+						disabled={resetting}
+						className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors disabled:opacity-50"
+					>
+						{resetting ? "Mereset..." : "Reset"}
+					</button>
+				</div>
 				<p className="body-3 text-neutral-400 mb-8">
 					Halo, {user.profile?.name ?? "Pemain"}! Pilih lab yang mau kamu
 					masuki.

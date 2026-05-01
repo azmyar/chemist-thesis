@@ -69,6 +69,17 @@ app.get("/rooms", (c) => {
 	});
 });
 
+// ── Reset Room State ──────────────────────────────
+
+app.post("/admin/reset/:roomId", async (c) => {
+	const roomId = c.req.param("roomId");
+	const id = c.env.GAME_ROOM.idFromName(roomId);
+	const stub = c.env.GAME_ROOM.get(id);
+
+	const response = await stub.fetch(new Request(new URL("/reset", c.req.url).toString(), { method: "POST" }));
+	return response;
+});
+
 // ── WebSocket Upgrade → Durable Object ────────────
 
 app.get("/room/:roomId", async (c) => {

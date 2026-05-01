@@ -350,6 +350,29 @@ export class GameRoom extends DurableObject {
 		await this.persistObjects();
 	}
 
+	/**
+	 * Reset all room state: clear objects, level states, and in-memory players.
+	 * After reset, the room will be freshly initialized on next load.
+	 */
+	private async resetAllState(): Promise<void> {
+		// Clear objects
+		await this.ctx.storage.delete("objects");
+
+		// Clear all player level states
+		const keys = await this.ctx.storage.list<string>();
+		for (const key of keys.keys()) {
+			if (key.startsWith("levelState:")) {
+				await this.ctx.storage.delete(key);
+			}
+		}
+
+		// Clear in-memory state
+		this.players.clear();
+		this.objects.clear();
+		this.levelStates.clear();
+		this.rateWindows.clear();
+	}
+
 	private initDefaults(): void {
 		// 40 workbench tiles: 4 pairs × 2 cols × 5 rows — each tile is an
 		// independent workbench so every student has their own bench slot.
@@ -1378,6 +1401,15 @@ export class GameRoom extends DurableObject {
 	async fetch(request: Request): Promise<Response> {
 		await this.loadState();
 		const url = new URL(request.url);
+
+		// Handle reset endpoint
+		if (url.pathname === "/reset" && request.method === "POST") {
+			await this.resetAllState();
+			return new Response(JSON.stringify({ success: true, message: "Room state reset" }), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
 
 		if (url.pathname !== "/ws") {
 			return new Response("Not found", { status: 404 });
