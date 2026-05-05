@@ -10,6 +10,7 @@ const OBJECT_LABELS: Record<GameObjectType, string> = {
 	timbangan: "Timbangan",
 	oven: "Oven",
 	furnace: "Tanur",
+	waste: "Pembuangan",
 };
 
 export function InteractButton() {

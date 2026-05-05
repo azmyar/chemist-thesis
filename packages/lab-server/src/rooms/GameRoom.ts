@@ -43,6 +43,7 @@ const GRAVIMETRIC_FACTOR_CU_CUO = 0.7987;
 const THEORETICAL_CU_PERCENT = 25.45;
 const TEST_TUBE_MAX_VOLUME_ML = 20;
 const SULFATE_TEST_REAGENT_ML = 1;
+const DEFAULT_STOCK_QUANTITY = 100;
 
 const LEVEL_MILESTONES = [
 	"Timbang terusi ±0,5g ke kaca arloji",
@@ -261,21 +262,74 @@ export class GameRoom extends DurableObject {
 			shouldPersist = true;
 		}
 
-		// Migration: add workbench-2..40 for rooms created before the 40-bench layout.
-		for (let i = 2; i <= 40; i++) {
+		// Migration: ensure every workbench (1..40) exists and is pre-stocked
+		// with the standard alat set. Empty workbenches (from rooms created
+		// before alat-per-bench was introduced) get auto-populated.
+		for (let i = 1; i <= 40; i++) {
 			const id = `workbench-${i}`;
-			if (!this.objects.has(id)) {
-				this.objects.set(id, { id, objectType: "workbench", items: [] });
+			const existing = this.objects.get(id);
+			if (!existing) {
+				this.objects.set(id, {
+					id,
+					objectType: "workbench",
+					items: this.defaultWorkbenchAlat(),
+				});
+				shouldPersist = true;
+			} else if (existing.items.length === 0) {
+				existing.items = this.defaultWorkbenchAlat();
 				shouldPersist = true;
 			}
 		}
 
-		// Ensure multiple timbangan exist (migration for rooms created before
-		// concurrency support). Adds timbangan-2..6 if missing.
-		for (let i = 2; i <= 6; i++) {
+		// Ensure remaining timbangan exist (top row removed — replaced with desikator).
+		for (let i = 4; i <= 6; i++) {
 			const id = `timbangan-${i}`;
 			if (!this.objects.has(id)) {
 				this.objects.set(id, { id, objectType: "timbangan", items: [] });
+				shouldPersist = true;
+			}
+		}
+
+		// Migration: add desikator stations (replaces old top timbangan row).
+		for (let i = 2; i <= 3; i++) {
+			const id = `desikator-${i}`;
+			if (!this.objects.has(id)) {
+				this.objects.set(id, {
+					id,
+					objectType: "storage",
+					items: [
+						{ itemId: "desikator", name: "Desikator", category: "alat", quantity: DEFAULT_STOCK_QUANTITY },
+					],
+				});
+				shouldPersist = true;
+			}
+		}
+		// Cleanup: drop desikator-1 if it exists from a prior version.
+		if (this.objects.has("desikator-1")) {
+			this.objects.delete("desikator-1");
+			shouldPersist = true;
+		}
+
+		// Migration: add waste containers (replaces in-workbench disposal zone).
+		for (let i = 1; i <= 4; i++) {
+			const id = `waste-${i}`;
+			if (!this.objects.has(id)) {
+				this.objects.set(id, { id, objectType: "waste", items: [] });
+				shouldPersist = true;
+			}
+		}
+
+		// Migration: add terusi sample stations beside each remaining timbangan.
+		for (let i = 1; i <= 3; i++) {
+			const id = `terusi-${i}`;
+			if (!this.objects.has(id)) {
+				this.objects.set(id, {
+					id,
+					objectType: "reagent_table",
+					items: [
+						{ itemId: "terusi", name: "Terusi (CuSO4·5H2O)", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, weightGrams: 10 },
+					],
+				});
 				shouldPersist = true;
 			}
 		}
@@ -292,7 +346,10 @@ export class GameRoom extends DurableObject {
 			shouldPersist = true;
 		}
 
-		if (this.ensureStorageTools()) {
+		// storage-1 is intentionally empty (alat distributed to workbenches);
+		// ensureStorageTools intentionally not called.
+
+		if (this.ensureStockQuantities()) {
 			shouldPersist = true;
 		}
 
@@ -373,23 +430,80 @@ export class GameRoom extends DurableObject {
 		this.rateWindows.clear();
 	}
 
+	/**
+	 * Alat needed for Cu gravimetri — pre-stocked at every workbench so each
+	 * student starts with their own equipment set (matches real-world lab
+	 * where alat are placed on each meja kerja before practical begins).
+	 * Returns a fresh deep copy each call so callers can mutate freely.
+	 */
+	private defaultWorkbenchAlat(): InventoryItem[] {
+		return JSON.parse(JSON.stringify([
+			{ itemId: "piala-gelas", name: "Piala Gelas", category: "alat", quantity: 1, maxVolumeMl: 250, contents: [] },
+			{ itemId: "pengaduk-kaca", name: "Pengaduk Kaca", category: "alat", quantity: 1 },
+			{ itemId: "hot-plate", name: "Teklu", category: "alat", quantity: 1 },
+			{ itemId: "corong-stand", name: "Corong + Stand", category: "alat", quantity: 1 },
+			{ itemId: "kertas-saring", name: "Kertas Saring Whatman", category: "alat", quantity: 1, maxVolumeMl: 20, contents: [] },
+			{ itemId: "erlenmeyer", name: "Erlenmeyer", category: "alat", quantity: 1, maxVolumeMl: 250, contents: [] },
+			{ itemId: "tabung-reaksi", name: "Tabung Reaksi", category: "alat", quantity: 2, maxVolumeMl: TEST_TUBE_MAX_VOLUME_ML, contents: [] },
+			{ itemId: "kertas-lakmus", name: "Kertas Lakmus Merah", category: "alat", quantity: 1 },
+			{ itemId: "krus-porselen", name: "Cawan Porselen", category: "alat", quantity: 1, maxVolumeMl: 30, contents: [] },
+			{ itemId: "kaca-arloji", name: "Kaca Arloji", category: "alat", quantity: 1, maxVolumeMl: 50, contents: [] },
+		]));
+	}
+
 	private initDefaults(): void {
-		// 40 workbench tiles: 4 pairs × 2 cols × 5 rows — each tile is an
+		// 40 workbench tiles: 4 pairs × 2 cols × 5 rows. Each tile is an
 		// independent workbench so every student has their own bench slot.
 		for (let i = 1; i <= 40; i++) {
 			this.objects.set(`workbench-${i}`, {
 				id: `workbench-${i}`,
 				objectType: "workbench",
+				items: this.defaultWorkbenchAlat(),
+			});
+		}
+
+		// Only the 3 lower timbangan slots in Ruang Timbang remain — the top
+		// row was repurposed for desikator.
+		for (let i = 4; i <= 6; i++) {
+			this.objects.set(`timbangan-${i}`, {
+				id: `timbangan-${i}`,
+				objectType: "timbangan",
 				items: [],
 			});
 		}
 
-		// Multiple timbangan instances to support concurrent weighing by many
-		// students (lab can host up to 10+ players simultaneously).
-		for (let i = 1; i <= 6; i++) {
-			this.objects.set(`timbangan-${i}`, {
-				id: `timbangan-${i}`,
-				objectType: "timbangan",
+		// Desikator stations at the top of Ruang Timbang (replaces the top
+		// timbangan row). Each holds 1 desikator that students grab to cool
+		// calcined crus.
+		for (let i = 2; i <= 3; i++) {
+			this.objects.set(`desikator-${i}`, {
+				id: `desikator-${i}`,
+				objectType: "storage",
+				items: [
+					{ itemId: "desikator", name: "Desikator", category: "alat", quantity: DEFAULT_STOCK_QUANTITY },
+				],
+			});
+		}
+
+		// Sample (terusi) stations beside each remaining timbangan — students
+		// grab terusi here, weigh it on the adjacent timbangan.
+		for (let i = 1; i <= 3; i++) {
+			this.objects.set(`terusi-${i}`, {
+				id: `terusi-${i}`,
+				objectType: "reagent_table",
+				items: [
+					{ itemId: "terusi", name: "Terusi (CuSO4·5H2O)", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, weightGrams: 10 },
+				],
+			});
+		}
+
+		// Waste containers (1 per bench row × 4 rows). Discard target for held
+		// containers — replaces the disposal zone that used to live inside the
+		// workbench sheet.
+		for (let i = 1; i <= 4; i++) {
+			this.objects.set(`waste-${i}`, {
+				id: `waste-${i}`,
+				objectType: "waste",
 				items: [],
 			});
 		}
@@ -412,41 +526,59 @@ export class GameRoom extends DurableObject {
 			items: [],
 		});
 
+		// storage-1 (alat rack) is now a non-functional cosmetic prop — alat
+		// have been distributed to each workbench. Kept in state so the rack
+		// tiles still render but interaction is disabled in LabScene.
 		this.objects.set("storage-1", {
 			id: "storage-1",
 			objectType: "storage",
-			items: [
-				{ itemId: "piala-gelas", name: "Piala Gelas", category: "alat", quantity: 2, maxVolumeMl: 250, contents: [] },
-				{ itemId: "pengaduk-kaca", name: "Pengaduk Kaca", category: "alat", quantity: 1 },
-				{ itemId: "hot-plate", name: "Teklu", category: "alat", quantity: 1 },
-				{ itemId: "meker", name: "Meker", category: "alat", quantity: 1 },
-				{ itemId: "corong-stand", name: "Corong + Stand", category: "alat", quantity: 1 },
-				{ itemId: "kertas-saring", name: "Kertas Saring Whatman", category: "alat", quantity: 3, maxVolumeMl: 20, contents: [] },
-				{ itemId: "erlenmeyer", name: "Erlenmeyer", category: "alat", quantity: 1, maxVolumeMl: 250, contents: [] },
-				{ itemId: "tabung-reaksi", name: "Tabung Reaksi", category: "alat", quantity: 2, maxVolumeMl: TEST_TUBE_MAX_VOLUME_ML, contents: [] },
-				{ itemId: "kertas-lakmus", name: "Kertas Lakmus Merah", category: "alat", quantity: 5 },
-				{ itemId: "krus-porselen", name: "Cawan Porselen", category: "alat", quantity: 1, maxVolumeMl: 30, contents: [] },
-				{ itemId: "kaca-arloji", name: "Kaca Arloji", category: "alat", quantity: 3, maxVolumeMl: 50, contents: [] },
-				{ itemId: "desikator", name: "Desikator", category: "alat", quantity: 1 },
-			],
+			items: [],
 		});
 
 		this.objects.set("reagent-table-1", {
 			id: "reagent-table-1",
 			objectType: "reagent_table",
 			items: [
-				{ itemId: "terusi", name: "Terusi (CuSO4·5H2O)", category: "bahan", quantity: 1, weightGrams: 10 },
-				{ itemId: "air-suling", name: "Air Suling", category: "bahan", quantity: 1, volumeMl: 500 },
-				{ itemId: "h2so4", name: "H2SO4 4N", category: "bahan", quantity: 1, volumeMl: 100 },
-				{ itemId: "naoh", name: "NaOH 4N", category: "bahan", quantity: 1, volumeMl: 100 },
-				{ itemId: "naoh-1n", name: "NaOH 1N (encer)", category: "bahan", quantity: 1, volumeMl: 100 },
-				{ itemId: "naoh-8n", name: "NaOH 8N (pekat)", category: "bahan", quantity: 1, volumeMl: 100 },
-				{ itemId: "koh-4n", name: "KOH 4N", category: "bahan", quantity: 1, volumeMl: 100 },
-				{ itemId: "nh4oh-4n", name: "NH4OH 4N (amonia)", category: "bahan", quantity: 1, volumeMl: 100 },
-				{ itemId: "bacl2", name: "BaCl2 0,5N", category: "bahan", quantity: 1, volumeMl: 50 },
-				{ itemId: "hcl", name: "HCl 4N", category: "bahan", quantity: 1, volumeMl: 50 },
+				// terusi moved to terusi-1/-2/-3 next to each timbangan.
+				{ itemId: "air-suling", name: "Air Suling", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 500 },
+				{ itemId: "h2so4", name: "H2SO4 4N", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 100 },
+				{ itemId: "naoh", name: "NaOH 4N", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 100 },
+				{ itemId: "naoh-1n", name: "NaOH 1N (encer)", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 100 },
+				{ itemId: "naoh-8n", name: "NaOH 8N (pekat)", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 100 },
+				{ itemId: "koh-4n", name: "KOH 4N", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 100 },
+				{ itemId: "nh4oh-4n", name: "NH4OH 4N (amonia)", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 100 },
+				{ itemId: "bacl2", name: "BaCl2 0,5N", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 50 },
+				{ itemId: "hcl", name: "HCl 4N", category: "bahan", quantity: DEFAULT_STOCK_QUANTITY, volumeMl: 50 },
 			],
 		});
+	}
+
+	private ensureStockQuantities(): boolean {
+		let changed = false;
+
+		const storage = this.objects.get("storage-1");
+		if (storage) {
+			for (const item of storage.items) {
+				if (item.category !== "alat") continue;
+				if ((item.quantity ?? 0) < DEFAULT_STOCK_QUANTITY) {
+					item.quantity = DEFAULT_STOCK_QUANTITY;
+					changed = true;
+				}
+			}
+		}
+
+		const table = this.objects.get("reagent-table-1");
+		if (table) {
+			for (const item of table.items) {
+				if (item.category !== "bahan") continue;
+				if ((item.quantity ?? 0) < DEFAULT_STOCK_QUANTITY) {
+					item.quantity = DEFAULT_STOCK_QUANTITY;
+					changed = true;
+				}
+			}
+		}
+
+		return changed;
 	}
 
 	private ensureStorageTools(): boolean {
@@ -1440,9 +1572,9 @@ export class GameRoom extends DurableObject {
 		this.ctx.acceptWebSocket(server);
 
 		const ts = ROOM_CONFIG.TILE_SIZE;
-		// Spawn at bottom corridor of main lab: col 13, row 18.
-		const spawnCenterX = 13 * ts + ts / 2;
-		const spawnCenterY = 18 * ts + ts / 2;
+		// Spawn at bottom of main lab next to teacher desk row: col 12, row 17.
+		const spawnCenterX = 12 * ts + ts / 2;
+		const spawnCenterY = 17 * ts + ts / 2;
 		const spawnOffsetX = (Math.random() - 0.5) * ts * 0.5;
 		const spawnOffsetY = (Math.random() - 0.5) * ts * 0.5;
 		const playerState: PlayerState = {

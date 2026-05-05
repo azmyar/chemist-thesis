@@ -530,7 +530,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 		<>
 			<div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
-			<DndContext sensors={sensors} collisionDetection={workbenchCollisionDetection} onDragEnd={handleDragEnd}>
+			<DndContext sensors={sensors} collisionDetection={workbenchCollisionDetection} onDragEnd={handleDragEnd} autoScroll={false}>
 				<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ touchAction: "none" }}>
 					<div
 						className="workbench-sheet w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex min-h-0 flex-col"
@@ -592,16 +592,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 							</div>
 						</div>
 
-						{/* Disposal zone */}
-						<div
-							ref={setDisposalNodeRef}
-							className={`workbench-disposal mx-4 mb-2 shrink-0 rounded-xl border-2 border-dashed px-3 py-2 transition-colors ${isOverDisposal ? "border-rose-400 bg-rose-50" : "border-rose-200 bg-rose-50/40"}`}
-						>
-							<p className="text-sm font-semibold text-rose-700">🗑️ Pembuangan</p>
-							<p className="text-[11px] text-rose-500">Drag wadah ke sini untuk mengosongkan isi (padatan/larutan)</p>
-						</div>
-
-						{/* Hand tray */}
+{/* Hand tray */}
 						<div
 							ref={setHandNodeRef}
 							className={`workbench-hand mx-4 mb-4 p-3 rounded-2xl border-2 flex shrink-0 gap-2 min-h-[88px] select-none overflow-x-auto transition-colors ${isOverHand ? "bg-amber-100 border-amber-400" : "bg-amber-50 border-amber-200"}`}

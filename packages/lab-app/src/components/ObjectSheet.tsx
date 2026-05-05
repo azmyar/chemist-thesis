@@ -27,6 +27,7 @@ const OBJECT_LABELS: Record<GameObjectType, string> = {
 	timbangan: "Timbangan Analitik",
 	oven: "Oven Pengering",
 	furnace: "Tanur",
+	waste: "Pembuangan",
 };
 
 const OBJECT_DESC: Record<GameObjectType, string> = {
@@ -36,6 +37,7 @@ const OBJECT_DESC: Record<GameObjectType, string> = {
 	timbangan: "Pegang wadah + bahan padat, lalu timbang",
 	oven: "Taruh wadah sampel untuk proses pengeringan",
 	furnace: "Taruh wadah sampel untuk proses pemijaran di tanur",
+	waste: "Buang isi wadah (padatan/larutan)",
 };
 
 const ITEM_EMOJI: Record<string, string> = {
@@ -353,6 +355,74 @@ export function ObjectSheet() {
 				holding={holding}
 				onClose={handleClose}
 			/>
+		);
+	}
+
+	// Waste container — drag-from-hand-to-dropzone disposal UI.
+	if (objectType === "waste") {
+		const canDiscard = (item: HeldItem) => {
+			if (item.category !== "alat") return false;
+			const k = contentKind(item.itemId);
+			return item.maxVolumeMl !== undefined || k === "corong-stand";
+		};
+		const onWasteDragEnd = (event: DragEndEvent) => {
+			setActiveDrag(null);
+			const itemId = event.active.data.current?.itemId as string | undefined;
+			const source = event.active.data.current?.source as "object" | "hand" | undefined;
+			const overId = event.over ? String(event.over.id) : "";
+			if (!itemId || source !== "hand" || overId !== "drop-waste-disposal") return;
+			const held = holding.find((h) => h.itemId === itemId);
+			if (!held || !canDiscard(held) || (held.contents ?? []).length === 0) return;
+			handleDiscardHeld(itemId);
+		};
+		return (
+			<>
+				<div className="fixed inset-0 bg-black/30 z-40" onClick={handleClose} />
+				<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ touchAction: "none" }}>
+					<div
+						className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex min-h-0 flex-col"
+						style={{ height: "min(60dvh, 520px)", maxHeight: "calc(100dvh - 2rem)" }}
+					>
+						<div className="flex justify-center pt-3 pb-1 shrink-0">
+							<div className="w-12 h-1.5 rounded-full bg-neutral-300 cursor-pointer" onClick={handleClose} />
+						</div>
+						<div className="px-5 pb-2 shrink-0">
+							<h2 className="text-lg font-semibold text-rose-700">🗑️ Pembuangan</h2>
+							<p className="text-xs text-neutral-400">Drag wadah dari tangan ke zona pembuangan untuk mengosongkan isinya.</p>
+						</div>
+						<DndContext
+							sensors={sensors}
+							onDragStart={handleDragStart}
+							onDragEnd={onWasteDragEnd}
+							onDragCancel={() => setActiveDrag(null)}
+							autoScroll={false}
+						>
+							<DroppablePanel
+								id="drop-waste-disposal"
+								className="mx-4 mt-2 mb-3 flex-1 min-h-[140px] rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-4 flex flex-col items-center justify-center transition-colors"
+							>
+								<p className="text-3xl">🛢️</p>
+								<p className="mt-2 text-sm font-semibold text-rose-700">Buang ke sini</p>
+								<p className="mt-0.5 text-[11px] text-rose-500">Wadah tetap di tangan, isinya dibuang</p>
+							</DroppablePanel>
+							<div className="workbench-hand mx-4 mb-4 p-3 rounded-2xl border-2 flex shrink-0 gap-2 min-h-[112px] select-none overflow-x-auto bg-amber-50 border-amber-200">
+								<div className="text-xs text-amber-400 self-center mr-1 shrink-0">🤲</div>
+								{holding.length === 0 && (
+									<p className="text-xs text-amber-300 self-center">Tangan kosong</p>
+								)}
+								{holding.map((item, index) => (
+									<DraggableObjectCard
+										key={`${item.itemId}-${index}`}
+										id={`hand-${item.itemId}-${index}`}
+										item={item}
+										variant="hand"
+									/>
+								))}
+							</div>
+						</DndContext>
+					</div>
+				</div>
+			</>
 		);
 	}
 

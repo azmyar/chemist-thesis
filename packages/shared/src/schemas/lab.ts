@@ -188,6 +188,7 @@ export const gameObjectTypeSchema = z.enum([
 	"timbangan",
 	"oven",
 	"furnace",
+	"waste",
 ]);
 export type GameObjectType = z.infer<typeof gameObjectTypeSchema>;
 
@@ -388,11 +389,11 @@ export type ServerMessage =
 
 export const ROOM_CONFIG = {
 	MAX_PLAYERS: 20,
-	MAP_WIDTH: 896,
-	MAP_HEIGHT: 672,
+	MAP_WIDTH: 736,
+	MAP_HEIGHT: 608,
 	TILE_SIZE: 32,
-	MAP_COLS: 28,
-	MAP_ROWS: 21,
+	MAP_COLS: 23,
+	MAP_ROWS: 19,
 	PLAYER_SPEED: 120,
 } as const;
 

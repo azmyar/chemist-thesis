@@ -40,7 +40,11 @@ export function LobbyView({ user }: LobbyViewProps) {
 			sessionStorage.clear();
 
 			// Call server reset
-			const res = await fetch("/api/reset-state", { method: "POST" });
+			const res = await fetch("/api/reset-state", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ roomId: "lab-umum" }),
+			});
 			if (res.ok) {
 				alert("Progress reset berhasil!");
 				window.location.reload();

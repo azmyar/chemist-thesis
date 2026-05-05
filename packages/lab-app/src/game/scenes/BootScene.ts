@@ -85,34 +85,74 @@ export class BootScene extends Phaser.Scene {
 		fCtx.fillRect(22, 6, 2, 2);
 		floor.refresh();
 
-		// Wall tile — 32×32 brick pattern
-		const wall = this.textures.createCanvas("tile-wall", 32, 32)!;
-		const wCtx = wall.context;
-		wCtx.fillStyle = "#495057";
-		wCtx.fillRect(0, 0, 32, 32);
-		wCtx.fillStyle = "#5c636a";
-		wCtx.fillRect(1, 1, 13, 6);
-		wCtx.fillRect(17, 1, 14, 6);
-		wCtx.fillRect(1, 9, 6, 6);
-		wCtx.fillRect(10, 9, 13, 6);
-		wCtx.fillRect(26, 9, 5, 6);
-		wCtx.fillRect(1, 17, 13, 6);
-		wCtx.fillRect(17, 17, 14, 6);
-		wCtx.fillRect(1, 25, 6, 6);
-		wCtx.fillRect(10, 25, 13, 6);
-		wCtx.fillRect(26, 25, 5, 6);
-		wCtx.fillStyle = "#3d4349";
-		wCtx.fillRect(0, 0, 32, 1);
-		wCtx.fillRect(0, 8, 32, 1);
-		wCtx.fillRect(0, 16, 32, 1);
-		wCtx.fillRect(0, 24, 32, 1);
-		wCtx.fillRect(15, 0, 1, 8);
-		wCtx.fillRect(8, 8, 1, 8);
-		wCtx.fillRect(24, 8, 1, 8);
-		wCtx.fillRect(15, 16, 1, 8);
-		wCtx.fillRect(8, 24, 1, 8);
-		wCtx.fillRect(24, 24, 1, 8);
-		wall.refresh();
+		// Wall tile — 32×32 glass panel, 16 auto-tile variants based on which
+		// of the 4 neighbors (N/E/S/W) are also walls. Edges that face floor
+		// get the aluminum frame; edges that face another wall don't, so
+		// adjacent wall tiles read as one continuous panel.
+		// Bit pattern: N=8, E=4, S=2, W=1 → texture key `tile-wall-{0..15}`.
+		// `tile-wall` (no suffix) is the isolated variant (no neighbors).
+		for (let i = 0; i < 16; i++) {
+			const n = (i & 8) !== 0;
+			const e = (i & 4) !== 0;
+			const s = (i & 2) !== 0;
+			const w = (i & 1) !== 0;
+			const key = `tile-wall-${i}`;
+			const wall = this.textures.createCanvas(key, 32, 32)!;
+			const wCtx = wall.context;
+
+			// Glass pane base (full tile so adjacent variants tile seamlessly).
+			wCtx.fillStyle = "#cfe8f2";
+			wCtx.fillRect(0, 0, 32, 32);
+			// Subtle horizontal tint bands for depth.
+			wCtx.fillStyle = "#bcdcec";
+			wCtx.fillRect(0, 0, 32, 8);
+			wCtx.fillRect(0, 24, 32, 8);
+			// Diagonal highlight streaks (reflection).
+			wCtx.fillStyle = "#eaf6fb";
+			wCtx.fillRect(6, 0, 2, 32);
+			wCtx.fillRect(9, 0, 1, 32);
+			wCtx.fillStyle = "#f7fcfe";
+			wCtx.fillRect(20, 0, 1, 32);
+
+			// Frame edges: drawn only on sides facing floor (no wall neighbor).
+			// Top edge.
+			if (!n) {
+				wCtx.fillStyle = "#8a9199";
+				wCtx.fillRect(0, 0, 32, 2);
+				wCtx.fillStyle = "#5d6269";
+				wCtx.fillRect(0, 0, 32, 1);
+				wCtx.fillStyle = "#6c7178";
+				wCtx.fillRect(0, 2, 32, 1);
+			}
+			// Bottom edge.
+			if (!s) {
+				wCtx.fillStyle = "#8a9199";
+				wCtx.fillRect(0, 30, 32, 2);
+				wCtx.fillStyle = "#a7aeb6";
+				wCtx.fillRect(0, 31, 32, 1);
+				wCtx.fillStyle = "#aab2bb";
+				wCtx.fillRect(0, 29, 32, 1);
+			}
+			// Left edge.
+			if (!w) {
+				wCtx.fillStyle = "#8a9199";
+				wCtx.fillRect(0, 0, 2, 32);
+				wCtx.fillStyle = "#5d6269";
+				wCtx.fillRect(0, 0, 1, 32);
+				wCtx.fillStyle = "#6c7178";
+				wCtx.fillRect(2, 0, 1, 32);
+			}
+			// Right edge.
+			if (!e) {
+				wCtx.fillStyle = "#8a9199";
+				wCtx.fillRect(30, 0, 2, 32);
+				wCtx.fillStyle = "#a7aeb6";
+				wCtx.fillRect(31, 0, 1, 32);
+				wCtx.fillStyle = "#aab2bb";
+				wCtx.fillRect(29, 0, 1, 32);
+			}
+			wall.refresh();
+		}
 
 		// Lab table — 64×32
 		const table = this.textures.createCanvas("lab-table", 64, 32)!;
@@ -301,6 +341,50 @@ export class BootScene extends Phaser.Scene {
 		sCtx.fillStyle = "#ffffff";
 		sCtx.fillRect(3, 3, 26, 1);
 		stor.refresh();
+
+		// Waste container — 32×32 lab jerrycan (dirigen) for chemical waste.
+		// White/yellow plastic body with a screw-cap handle on top and a hazard
+		// label on the front.
+		const wb2 = this.textures.createCanvas("waste-bin", 32, 32)!;
+		const wbCtx2 = wb2.context;
+		// Cap neck
+		wbCtx2.fillStyle = "#868e96";
+		wbCtx2.fillRect(13, 3, 6, 3);
+		// Cap top
+		wbCtx2.fillStyle = "#495057";
+		wbCtx2.fillRect(12, 2, 8, 2);
+		wbCtx2.fillStyle = "#343a40";
+		wbCtx2.fillRect(12, 2, 8, 1);
+		// Body (slightly off-white, jerrycan shape)
+		wbCtx2.fillStyle = "#f8f9fa";
+		wbCtx2.fillRect(5, 6, 22, 24);
+		// Side highlight
+		wbCtx2.fillStyle = "#ffffff";
+		wbCtx2.fillRect(6, 7, 3, 22);
+		// Side shadow
+		wbCtx2.fillStyle = "#dee2e6";
+		wbCtx2.fillRect(24, 7, 2, 22);
+		wbCtx2.fillStyle = "#ced4da";
+		wbCtx2.fillRect(26, 6, 1, 24);
+		// Body outline
+		wbCtx2.fillStyle = "#adb5bd";
+		wbCtx2.fillRect(5, 6, 22, 1);
+		wbCtx2.fillRect(5, 29, 22, 1);
+		wbCtx2.fillRect(5, 6, 1, 24);
+		// Carrying handle (loop on top-left)
+		wbCtx2.fillStyle = "#868e96";
+		wbCtx2.fillRect(7, 6, 5, 2);
+		wbCtx2.fillStyle = "#495057";
+		wbCtx2.fillRect(7, 5, 1, 2);
+		wbCtx2.fillRect(11, 5, 1, 2);
+		wbCtx2.fillStyle = "#adb5bd";
+		wbCtx2.fillRect(8, 7, 3, 1);
+		// Liquid level line at the bottom (visible through translucent body).
+		wbCtx2.fillStyle = "#a5d8ff";
+		wbCtx2.fillRect(6, 24, 20, 1);
+		wbCtx2.fillStyle = "#74c0fc";
+		wbCtx2.fillRect(6, 25, 20, 4);
+		wb2.refresh();
 
 		// Reagent table — 32×32 clean white with colored bottles
 		const rt = this.textures.createCanvas("reagent-table", 32, 32)!;

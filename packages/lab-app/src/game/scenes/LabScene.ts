@@ -11,8 +11,8 @@ import { ROOM_CONFIG } from "@/lib/protocol";
 import type { UIScene } from "./UIScene";
 
 /** Camera zoom — sprites are 1:1 native, camera magnifies everything like Gather.town */
-const DESKTOP_CAMERA_ZOOM = 3;
-const MOBILE_CAMERA_ZOOM = 2.35;
+const DESKTOP_CAMERA_ZOOM = 1.6;
+const MOBILE_CAMERA_ZOOM = 1.25;
 const PLAYER_SPEED = ROOM_CONFIG.PLAYER_SPEED;
 
 interface ChatBubble {
@@ -117,9 +117,9 @@ export class LabScene extends Phaser.Scene {
 	/**
 	 * Build the gravimetri lab map — zoned layout matching the real SMAK lab
 	 * denah: Ruang Timbang (left-top), Ruang Bahan Kimia (left-mid), Ruang
-	 * Pengelola (left-bottom, cosmetic), Main Lab (center), Ruang Alat
-	 * Kebersihan (right-top, cosmetic), Gudang (right-mid), Oven/Tanur area
-	 * (right-bottom), plus a wastafel strip along the top wall.
+	 * Pengelola (left-bottom, cosmetic), Main Lab (center), Gudang
+	 * (right-mid), Oven/Tanur area (right-bottom), plus a wastafel strip
+	 * along the top wall.
 	 *
 	 * Interactable objects live in their chemistry-correct zones; cosmetic
 	 * fixtures (wastafel, shower, whiteboard, papan tulis) are decor only.
@@ -139,9 +139,14 @@ export class LabScene extends Phaser.Scene {
 		const isInBounds = (col: number, row: number) =>
 			col >= 0 && col < MAP_COLS && row >= 0 && row < MAP_ROWS;
 
+		// Wall positions are collected first; sprites are emitted at the end of
+		// this method so each tile can pick the auto-tile variant matching its
+		// 4 neighbors (no visible seam between adjacent walls).
+		const wallSet = new Set<string>();
+		const wallKey = (col: number, row: number) => `${col},${row}`;
 		const placeWallTile = (col: number, row: number) => {
 			if (!isInBounds(col, row)) return;
-			this.add.sprite(tileX(col), tileY(row), "tile-wall").setDepth(0);
+			wallSet.add(wallKey(col, row));
 			this.blocked[row][col] = true;
 		};
 
@@ -173,14 +178,11 @@ export class LabScene extends Phaser.Scene {
 			{ axis: "h", fixed: 10, from: 1, to: 5, doors: [] },
 			// Horizontal partition inside left column: between Ruang Bahan Kimia & Ruang Pengelola.
 			{ axis: "h", fixed: 14, from: 1, to: 5, doors: [] },
-			// Ruang Kebersihan (top-right, 7×2 interior): left wall col 19, bottom wall row 3 with door at col 21.
-			{ axis: "v", fixed: 19, from: 1, to: 3, doors: [] },
-			{ axis: "h", fixed: 3, from: 20, to: 26, doors: [21] },
-			// Gudang (7×2 interior), 4 tiles below Ruang Kebersihan.
-			// Left wall col 19 rows 8-11 with door at row 9, top/bottom walls solid.
-			{ axis: "v", fixed: 19, from: 8, to: 11, doors: [9] },
-			{ axis: "h", fixed: 8, from: 20, to: 26, doors: [] },
-			{ axis: "h", fixed: 11, from: 20, to: 26, doors: [] },
+			// Gudang (4×1 interior), top-right area.
+			// Left wall col 17 rows 7-9 fully closed, top/bottom walls solid.
+			{ axis: "v", fixed: 17, from: 7, to: 9, doors: [] },
+			{ axis: "h", fixed: 7, from: 18, to: 21, doors: [] },
+			{ axis: "h", fixed: 9, from: 18, to: 21, doors: [] },
 		];
 		for (const seg of segments) {
 			for (let i = seg.from; i <= seg.to; i++) {
@@ -210,39 +212,34 @@ export class LabScene extends Phaser.Scene {
 		labelZone("Ruang Timbang", 1, 1);
 		labelZone("Ruang Bahan Kimia", 1, 11);
 		labelZone("Ruang Pengelola", 1, 15);
-		labelZone("Ruang Kebersihan", 20, 1);
-		labelZone("Gudang", 20, 9);
+		labelZone("Gudang", 18, 8);
 		labelZone("Meja Kerja (Laboratorium Utama)", 9, 1);
 
 		// ── Cosmetic decor ──
 		// Wastafel strip flush with the top outer wall (row 1).
-		for (const col of [7, 10, 13, 16]) {
+		for (const col of [7, 10, 12, 15]) {
 			this.add.sprite(tileX(col), tileY(1), "sink-station").setDepth(3);
 			this.blocked[1][col] = true;
 		}
 
-		// Emergency shower inline with the wastafel strip at row 1, flush against
-		// Ruang Kebersihan's left wall (col 18, rightmost spot in main lab row 1).
-		this.add.sprite(tileX(18), tileY(1), "emergency-shower").setDepth(3);
-		this.blocked[1][18] = true;
+		// Emergency shower inline with the wastafel strip at row 1.
+		this.add.sprite(tileX(16), tileY(1), "emergency-shower").setDepth(3);
+		this.blocked[1][16] = true;
 
-		// Teacher desk + whiteboard along the bottom of main lab (row 14, adjacent to outer wall).
-		this.add.sprite(tileX(15), tileY(MAP_ROWS - 2), "teacher-desk").setDepth(3);
-		this.blocked[MAP_ROWS - 2][15] = true;
-		this.blocked[MAP_ROWS - 2][16] = true;
-		this.add.sprite(tileX(19), tileY(MAP_ROWS - 2), "whiteboard").setDepth(3);
-		this.blocked[MAP_ROWS - 2][19] = true;
-		this.blocked[MAP_ROWS - 2][20] = true;
+		// Meja base under each desikator (Ruang Timbang top row). The desikator
+		// sprite is rendered later via objectDefs at depth 5; the base is at
+		// depth 4 so the desikator dome stacks visually on top of the table.
+		for (const col of [3, 5]) {
+			this.add.sprite(tileX(col), tileY(1), "meja-tengah").setDepth(4);
+		}
 
-		// 4 pairs × 2 columns × 5 rows = 40 individual workbench tiles.
+// 4 pairs × 2 columns × 5 rows = 40 individual workbench tiles.
 		// Top pairs rows 4-8, bottom pairs rows 12-16, corridor rows 9-11.
-		// Column pairs: 10-11 and 16-17.
-		// Aisles: col 9 (left outer), cols 12-15 (center), cols 18-22 (right).
 		const BENCH_PAIRS: { colA: number; colB: number; rowStart: number; rowEnd: number }[] = [
 			{ colA: 9, colB: 10, rowStart: 4, rowEnd: 8 },    // top-left
-			{ colA: 15, colB: 16, rowStart: 4, rowEnd: 8 },   // top-right
-			{ colA: 9, colB: 10, rowStart: 13, rowEnd: 17 },  // bottom-left
-			{ colA: 17, colB: 18, rowStart: 13, rowEnd: 17 }, // bottom-right
+			{ colA: 14, colB: 15, rowStart: 4, rowEnd: 8 },   // top-right
+			{ colA: 9, colB: 10, rowStart: 11, rowEnd: 15 },  // bottom-left
+			{ colA: 17, colB: 18, rowStart: 11, rowEnd: 15 }, // bottom-right
 		];
 
 		let wbIdx = 1;
@@ -275,87 +272,56 @@ export class LabScene extends Phaser.Scene {
 		// Uses the dark-wood "meja-tengah" texture to visually distinguish it
 		// from the white workbenches.
 		for (const col of [13, 14]) {
-			for (let row = 13; row <= 17; row++) {
+			for (let row = 11; row <= 15; row++) {
 				this.add.sprite(tileX(col), tileY(row), "meja-tengah").setDepth(5);
 				this.blocked[row][col] = true;
 			}
 		}
 
-		// Table placeholders along the top (row 12) and right (col 26) edges of
-		// the empty space below Gudang. Cosmetic L-shape, non-interactable.
-		for (let col = 20; col <= 26; col++) {
-			this.add.sprite(tileX(col), tileY(12), "meja-tengah").setDepth(5);
-			this.blocked[12][col] = true;
-		}
-		for (let row = 13; row <= MAP_ROWS - 2; row++) {
-			this.add.sprite(tileX(26), tileY(row), "meja-tengah").setDepth(5);
-			this.blocked[row][26] = true;
+		// Placeholder under each equipment tile (oven/oven/furnace at col 21).
+		for (const row of [13, 15, 17]) {
+			this.add.sprite(tileX(21), tileY(row), "meja-tengah").setDepth(5);
+			this.blocked[row][21] = true;
 		}
 
-		// Gap between Ruang Kebersihan (row 3) and Gudang (row 8) — cols 20-26
-		// rows 4-7. Right column (col 26) is occupied by 2 ruang asam (fume
-		// hoods). The alat rack (storage-1) is split visually into a top 1×4
-		// strip (row 4 cols 22-25) and a bottom 1×6 strip (row 7 cols 20-25),
-		// but every tile shares the single storage-1 state — grabbing from
-		// any tile draws from the same inventory. Col 20 row 4 stays as a
-		// cosmetic placeholder (meja-tengah) since the top rack is 1×4.
-		this.add.sprite(tileX(20), tileY(4), "meja-tengah").setDepth(5);
-		this.blocked[4][20] = true;
-
+		// Top-right area above Gudang — top rack flush against top wall (row 1)
+		// and bottom rack flush against Gudang top wall (row 6, just above
+		// Gudang's row 7 top wall). Right column (col 21) is occupied by 2
+		// ruang asam (fume hoods) at rows 2-5. The alat rack (storage-1) is
+		// split visually into a top 1×3 strip and a bottom 1×3 strip, but
+		// every tile shares the single storage-1 state.
 		const RACK_TILES: { col: number; row: number }[] = [
-			// Top rack: 1×4 at row 4, cols 22-25.
-			{ col: 22, row: 4 },
-			{ col: 23, row: 4 },
-			{ col: 24, row: 4 },
-			{ col: 25, row: 4 },
-			// Bottom rack: 1×6 at row 7, cols 20-25.
-			{ col: 20, row: 7 },
-			{ col: 21, row: 7 },
-			{ col: 22, row: 7 },
-			{ col: 23, row: 7 },
-			{ col: 24, row: 7 },
-			{ col: 25, row: 7 },
+			// Top rack: 1×3 at row 1, cols 18-20.
+			{ col: 18, row: 1 },
+			{ col: 19, row: 1 },
+			{ col: 20, row: 1 },
+			// Bottom rack: 1×3 at row 6, cols 18-20.
+			{ col: 18, row: 6 },
+			{ col: 19, row: 6 },
+			{ col: 20, row: 6 },
 		];
+		// Rack tiles are cosmetic only — alat have been distributed to each
+		// workbench, so the rack is no longer interactable. Sprites still
+		// drawn for visual continuity; not pushed into `interactables`.
 		for (const { col, row } of RACK_TILES) {
-			const ox = tileX(col);
-			const oy = tileY(row);
-			const sprite = this.add.sprite(ox, oy, "storage").setDepth(5);
-			const label = this.add
-				.text(ox, oy - 20, "[E]", {
-					fontSize: "11px",
-					color: "#ffd43b",
-					backgroundColor: "#00000099",
-					padding: { x: 3, y: 1 },
-				})
-				.setOrigin(0.5, 1)
-				.setScale(invScale)
-				.setDepth(15)
-				.setVisible(false);
-			this.interactables.push({
-				id: "storage-1",
-				objectType: "storage",
-				x: ox,
-				y: oy,
-				sprite,
-				label,
-			});
+			this.add.sprite(tileX(col), tileY(row), "storage").setDepth(5);
 			this.blocked[row][col] = true;
 		}
-		// 2 ruang asam on col 26: top covers rows 4-5, bottom covers rows 6-7.
-		const asamTopY = (tileY(4) + tileY(5)) / 2;
+		// 2 ruang asam on col 21: top covers rows 2-3, bottom covers rows 4-5.
+		const asamTopY = (tileY(2) + tileY(3)) / 2;
 		this.add
-			.sprite(tileX(26), asamTopY, "fume-hood")
+			.sprite(tileX(21), asamTopY, "fume-hood")
 			.setDepth(5)
 			.setDisplaySize(TILE_SIZE, TILE_SIZE * 2);
-		this.blocked[4][26] = true;
-		this.blocked[5][26] = true;
-		const asamBottomY = (tileY(6) + tileY(7)) / 2;
+		this.blocked[2][21] = true;
+		this.blocked[3][21] = true;
+		const asamBottomY = (tileY(4) + tileY(5)) / 2;
 		this.add
-			.sprite(tileX(26), asamBottomY, "fume-hood")
+			.sprite(tileX(21), asamBottomY, "fume-hood")
 			.setDepth(5)
 			.setDisplaySize(TILE_SIZE, TILE_SIZE * 2);
-		this.blocked[6][26] = true;
-		this.blocked[7][26] = true;
+		this.blocked[4][21] = true;
+		this.blocked[5][21] = true;
 
 		// Interior accents in Ruang Pengelola (admin room) — a desk anchored to bottom.
 		this.add.sprite(tileX(3), tileY(MAP_ROWS - 2), "teacher-desk").setDepth(3);
@@ -370,21 +336,32 @@ export class LabScene extends Phaser.Scene {
 			col: number;
 			row: number;
 		}[] = [
-			// Ruang Timbang — 6 analytical balances in an L-shape hugging the
-			// top wall (row 1) and left wall (col 1), with 2-tile spacing.
-			{ id: "timbangan-1", objectType: "timbangan", texture: "timbangan", col: 1, row: 1 },
-			{ id: "timbangan-2", objectType: "timbangan", texture: "timbangan", col: 3, row: 1 },
-			{ id: "timbangan-3", objectType: "timbangan", texture: "timbangan", col: 5, row: 1 },
+			// Ruang Timbang — top row (row 1) has 2 desikator stations on tables.
+			// Left column (col 1): 3 timbangan, each with its terusi sample
+			// container in the row directly below it.
+			{ id: "desikator-2", objectType: "storage", texture: "desiccator", col: 3, row: 1 },
+			{ id: "desikator-3", objectType: "storage", texture: "desiccator", col: 5, row: 1 },
 			{ id: "timbangan-4", objectType: "timbangan", texture: "timbangan", col: 1, row: 3 },
 			{ id: "timbangan-5", objectType: "timbangan", texture: "timbangan", col: 1, row: 5 },
 			{ id: "timbangan-6", objectType: "timbangan", texture: "timbangan", col: 1, row: 7 },
+			{ id: "terusi-1", objectType: "reagent_table", texture: "reagent-table", col: 1, row: 4 },
+			{ id: "terusi-2", objectType: "reagent_table", texture: "reagent-table", col: 1, row: 6 },
+			{ id: "terusi-3", objectType: "reagent_table", texture: "reagent-table", col: 1, row: 8 },
 			// Ruang Bahan Kimia — reagent storage, anchored to bottom row of Bahan Kimia rows 11-13.
 			{ id: "reagent-table-1", objectType: "reagent_table", texture: "reagent-table", col: 3, row: 13 },
-			// Equipment on top of the right placeholder tables (col 26) below Gudang.
+			// Equipment on top of the right placeholder tables (col 21) below Gudang.
 			// Order top-to-bottom: oven (r13), gap (r14), oven (r15), gap (r16), tanur (r17).
-			{ id: "oven-1", objectType: "oven", texture: "oven", col: 26, row: 13 },
-			{ id: "oven-2", objectType: "oven", texture: "oven", col: 26, row: 15 },
-			{ id: "furnace-1", objectType: "furnace", texture: "furnace", col: 26, row: 17 },
+			{ id: "oven-1", objectType: "oven", texture: "oven", col: 21, row: 13 },
+			{ id: "oven-2", objectType: "oven", texture: "oven", col: 21, row: 15 },
+			{ id: "furnace-1", objectType: "furnace", texture: "furnace", col: 21, row: 17 },
+
+			// Waste containers — 1 per bench row, placed in the corridor below
+			// each bench pair so students can dispose container contents
+			// without leaving their bench area.
+			{ id: "waste-1", objectType: "waste", texture: "waste-bin", col: 9, row: 9 },   // below top-left
+			{ id: "waste-2", objectType: "waste", texture: "waste-bin", col: 14, row: 9 },  // below top-right
+			{ id: "waste-3", objectType: "waste", texture: "waste-bin", col: 9, row: 16 },  // below bottom-left
+			{ id: "waste-4", objectType: "waste", texture: "waste-bin", col: 17, row: 16 }, // below bottom-right
 		];
 
 		for (const def of objectDefs) {
@@ -417,34 +394,22 @@ export class LabScene extends Phaser.Scene {
 			this.blocked[def.row][def.col] = true;
 		}
 
-		// Dev grid overlay — col numbers along the top wall (row 0) and row
-		// numbers along the left wall (col 0). Toggle DEV_GRID to hide.
-		const DEV_GRID = true;
-		if (DEV_GRID) {
-			for (let col = 0; col < MAP_COLS; col++) {
-				this.add
-					.text(tileX(col), tileY(0), String(col), {
-						fontSize: "10px",
-						color: "#ffffff",
-						backgroundColor: "#dc354588",
-						padding: { x: 2, y: 0 },
-					})
-					.setOrigin(0.5, 0.5)
-					.setScale(invScale)
-					.setDepth(100);
-			}
-			for (let row = 0; row < MAP_ROWS; row++) {
-				this.add
-					.text(tileX(0), tileY(row), String(row), {
-						fontSize: "10px",
-						color: "#ffffff",
-						backgroundColor: "#dc354588",
-						padding: { x: 2, y: 0 },
-					})
-					.setOrigin(0.5, 0.5)
-					.setScale(invScale)
-					.setDepth(100);
-			}
+		// ── Render walls with auto-tile variants ──
+		// Now that every wall position is known, emit one sprite per wall
+		// using the variant whose frame edges face the floor (no neighbor)
+		// and whose interior edges blend into adjacent walls.
+		for (const k of wallSet) {
+			const [colStr, rowStr] = k.split(",");
+			const col = Number(colStr);
+			const row = Number(rowStr);
+			const n = wallSet.has(wallKey(col, row - 1)) ? 8 : 0;
+			const e = wallSet.has(wallKey(col + 1, row)) ? 4 : 0;
+			const s = wallSet.has(wallKey(col, row + 1)) ? 2 : 0;
+			const w = wallSet.has(wallKey(col - 1, row)) ? 1 : 0;
+			const variant = n | e | s | w;
+			this.add
+				.sprite(tileX(col), tileY(row), `tile-wall-${variant}`)
+				.setDepth(0);
 		}
 	}
 
@@ -475,10 +440,10 @@ export class LabScene extends Phaser.Scene {
 
 	private createLocalPlayer() {
 		const { MAP_COLS, MAP_ROWS, TILE_SIZE } = ROOM_CONFIG;
-		// Initial render position matches server spawn: col 13, row 18 (bottom corridor, main lab).
+		// Initial render position matches server spawn: col 12, row 17 (bottom of main lab).
 		// Real position is overwritten immediately on snapshot receipt.
-		const centerX = 13 * TILE_SIZE + TILE_SIZE / 2;
-		const centerY = 18 * TILE_SIZE + TILE_SIZE / 2;
+		const centerX = 12 * TILE_SIZE + TILE_SIZE / 2;
+		const centerY = 17 * TILE_SIZE + TILE_SIZE / 2;
 
 		this.localPlayer = this.add
 			.sprite(centerX, centerY, "player", 0)
