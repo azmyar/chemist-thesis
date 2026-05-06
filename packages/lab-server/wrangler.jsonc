@@ -49,7 +49,7 @@
 				]
 			},
 			"vars": {
-				"FRONTEND_ORIGIN": "https://lab-app-seven.vercel.app"
+				"FRONTEND_ORIGIN": "https://lab.chemist.id"
 			}
 		}
 	}
