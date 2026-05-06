@@ -530,7 +530,7 @@ export function WorkbenchSheet({ objectId, items, holding, onClose }: WorkbenchS
 		<>
 			<div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
-			<DndContext sensors={sensors} collisionDetection={workbenchCollisionDetection} onDragEnd={handleDragEnd} autoScroll={false}>
+			<DndContext sensors={sensors} collisionDetection={workbenchCollisionDetection} onDragEnd={handleDragEnd} autoScroll={{ threshold: { x: 0, y: 0.08 }, acceleration: 5 }}>
 				<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ touchAction: "none" }}>
 					<div
 						className="workbench-sheet w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex min-h-0 flex-col"
