@@ -1874,7 +1874,11 @@ export class GameRoom extends DurableObject {
 				return this.blockWithConcept(playerId, "weigh.non_canonical_container");
 			}
 
-			const currentSample = container.labMeta?.sampleTerusiG ?? this.getSolidWeight(container, "terusi");
+			// Source of truth = contents (matches frontend alreadyInContainerG).
+			// labMeta.sampleTerusiG can be stale (e.g. carried over from a prior
+			// session or copied via setup/swap paths) and would block scoops even
+			// when contents is empty.
+			const currentSample = this.getSolidWeight(container, "terusi");
 			const nextSample = this.round4(currentSample + transferGrams);
 			if (nextSample > 0.55) {
 				return this.blockWithConcept(playerId, "weigh.too_much");
