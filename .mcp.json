@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "figma": {
+      "type": "http",
+      "url": "http://127.0.0.1:3845/mcp"
+    },
+    "TalkToFigma": {
+      "command": "bun",
+      "args": [
+        "run",
+        "/Users/azmyaryarizaldi/Documents/Project/CHEMIST/tools/cursor-talk-to-figma-mcp/dist/server.js"
+      ]
+    }
+  }
+}

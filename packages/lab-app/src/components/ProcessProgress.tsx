@@ -55,20 +55,27 @@ export function ProcessProgress() {
 
 	return (
 		<div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/55 p-4">
-			<div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl px-5 py-6">
-				<p className="text-[11px] uppercase tracking-wide text-neutral-500 mb-1">Proses Berjalan</p>
-				<h3 className="text-base font-semibold text-neutral-800 mb-4">{state.label}</h3>
-
-				<div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-					<div
-						className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-[width]"
-						style={{ width: `${pct}%` }}
-					/>
+			<div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+				{/* Header strip — brand */}
+				<div className="bg-primary-500 px-5 py-3">
+					<p className="text-[11px] font-bold uppercase tracking-wide text-white/85">
+						Proses Berjalan
+					</p>
+					<h3 className="mt-0.5 text-base font-bold text-white">{state.label}</h3>
 				</div>
 
-				<div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
-					<span>{pct.toFixed(0)}%</span>
-					<span className="font-mono tabular-nums">sisa {remainingSec}s</span>
+				<div className="px-5 py-4">
+					<div className="h-3 overflow-hidden rounded-full bg-neutral-100">
+						<div
+							className="h-full rounded-full bg-primary-500 transition-[width]"
+							style={{ width: `${pct}%` }}
+						/>
+					</div>
+
+					<div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+						<span className="font-semibold text-primary-600">{pct.toFixed(0)}%</span>
+						<span className="font-mono tabular-nums">sisa {remainingSec}s</span>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -219,13 +219,19 @@ export class GameClient {
 		}
 
 		const storageKey = "chemist-lab-session-id";
-		const existing = window.sessionStorage.getItem(storageKey);
+		// localStorage (bukan sessionStorage) agar ID—dan dengan demikian progres
+		// milestone siswa—bertahan meski tab ditutup lalu dibuka kembali.
+		const existing = window.localStorage.getItem(storageKey);
 		if (existing && /^[a-z0-9-]{4,64}$/.test(existing)) {
 			return existing;
 		}
 
-		const created = `guest-${Math.random().toString(36).slice(2, 12)}`;
-		window.sessionStorage.setItem(storageKey, created);
+		// Migrasi ID lama dari sessionStorage bila ada, supaya progres tidak putus.
+		const legacy = window.sessionStorage.getItem(storageKey);
+		const created = legacy && /^[a-z0-9-]{4,64}$/.test(legacy)
+			? legacy
+			: `guest-${Math.random().toString(36).slice(2, 12)}`;
+		window.localStorage.setItem(storageKey, created);
 		return created;
 	}
 }

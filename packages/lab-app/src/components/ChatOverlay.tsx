@@ -53,12 +53,12 @@ export function ChatOverlay() {
 				}}
 				placeholder="Tekan Enter untuk chat..."
 				maxLength={200}
-				className="chat-overlay-input w-64 max-[640px]:w-full max-[640px]:placeholder:text-xs max-[640px]:py-1 px-3 py-1.5 rounded-lg bg-black/60 border border-neutral-600 text-base text-neutral-100 placeholder-neutral-500 outline-none focus:border-cyan-500 transition-colors"
+				className="chat-overlay-input w-64 max-[640px]:w-full max-[640px]:placeholder:text-xs max-[640px]:py-1 px-3 py-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/15 text-base text-neutral-100 placeholder-neutral-400 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-500/30 transition-all"
 			/>
 			<button
 				onMouseDown={(e) => e.preventDefault()}
 				onClick={sendMessage}
-				className="chat-overlay-button px-3 py-1.5 max-[640px]:px-2 max-[640px]:py-1 max-[640px]:text-xs rounded-lg bg-cyan-600 hover:bg-cyan-500 text-sm text-white font-medium transition-colors shrink-0"
+				className="chat-overlay-button px-4 py-2 max-[640px]:px-2 max-[640px]:py-1 max-[640px]:text-xs rounded-xl bg-primary-500 hover:bg-primary-600 active:scale-95 text-sm text-white font-semibold transition-all shrink-0"
 			>
 				Kirim
 			</button>

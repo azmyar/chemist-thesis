@@ -18,6 +18,16 @@
 		]
 	},
 
+	// D1: database progres siswa untuk penelitian. Isi "database_id" dengan hasil
+	// `wrangler d1 create chemist-lab-progress` sebelum deploy.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "chemist-lab-progress",
+			"database_id": "bb9ae86b-8139-425e-992e-cdc0f81256cf"
+		}
+	],
+
 	"migrations": [
 		{
 			"tag": "v2-fresh-state",
@@ -35,6 +45,13 @@
 					}
 				]
 			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "chemist-lab-progress",
+					"database_id": "bb9ae86b-8139-425e-992e-cdc0f81256cf"
+				}
+			],
 			"vars": {
 				"FRONTEND_ORIGIN": "https://your-staging-frontend.vercel.app"
 			}
@@ -48,6 +65,13 @@
 					}
 				]
 			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "chemist-lab-progress",
+					"database_id": "bb9ae86b-8139-425e-992e-cdc0f81256cf"
+				}
+			],
 			"vars": {
 				"FRONTEND_ORIGIN": "https://lab.chemist.id"
 			}

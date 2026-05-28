@@ -60,17 +60,27 @@ export default function GameView({ roomId, playerName }: GameViewProps) {
 		<div className="relative w-screen h-[100dvh] overflow-hidden">
 			<GameCanvas roomId={roomId} />
 
-			{connected && <LevelOverlay />}
-			{connected && <ChatOverlay />}
-			{connected && <ObjectSheet />}
-			{connected && <ReportPanel />}
-			{connected && <ConceptFeedbackModal />}
-			{connected && <GuidedConceptCheckModal />}
-			{connected && <ProcessProgress />}
+			{/*
+				Overlay selalu di-mount (TIDAK digate `connected`) supaya useEffect
+				listener mereka — `object-items-changed`, `level-state`,
+				`local-hold-changed`, dst. — terdaftar SEBELUM Phaser/LabScene
+				men-dispatch snapshot. Sebelumnya, jika Phaser bootstrap lebih cepat
+				dari React commit (mis. cache hangat), event di-dispatch sebelum
+				ObjectSheet sempat register listener → alat/bahan tidak muncul.
+				Tiap overlay punya early-return saat state-nya kosong, jadi
+				mounting tanpa data tidak menampilkan UI.
+			*/}
+			<LevelOverlay />
+			<ChatOverlay />
+			<ObjectSheet />
+			<ReportPanel />
+			<ConceptFeedbackModal />
+			<GuidedConceptCheckModal />
+			<ProcessProgress />
 
-			{/* Connection overlays */}
+			{/* Connection overlays — z-[100] supaya menutupi overlay (z-40..z-90) */}
 			{!connected && connecting && (
-				<div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30">
+				<div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60">
 					<p className="heading-2 text-neutral-300">
 						Menghubungkan ke server...
 					</p>
@@ -78,7 +88,7 @@ export default function GameView({ roomId, playerName }: GameViewProps) {
 			)}
 
 			{!connected && connectionError && (
-				<div className="absolute inset-0 flex items-center justify-center bg-black/65 z-30">
+				<div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/70">
 					<p className="heading-2 text-red-200">{connectionError}</p>
 				</div>
 			)}

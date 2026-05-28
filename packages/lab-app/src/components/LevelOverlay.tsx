@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LevelState } from "@/lib/protocol";
 import { gameClient } from "@/lib/network/client";
+import { ChemistLogomark } from "./ui/ChemistLogomark";
 
 function useIsCompact() {
 	const [compact, setCompact] = useState(false);
@@ -73,11 +74,14 @@ export function LevelOverlay() {
 				)}
 				<button
 					onClick={() => setExpanded(true)}
-					className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white/95 px-3 py-1.5 shadow-lg backdrop-blur"
+					className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur active:scale-95"
 				>
-					<div className="relative h-1.5 w-16 overflow-hidden rounded-full bg-neutral-100">
+					<span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-50 text-primary-500">
+						<ChemistLogomark className="h-3 w-3" />
+					</span>
+					<div className="relative h-2 w-16 overflow-hidden rounded-full bg-neutral-100">
 						<div
-							className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all"
+							className="h-full rounded-full bg-primary-500 transition-all"
 							style={{ width: `${progress}%` }}
 						/>
 					</div>
@@ -100,38 +104,56 @@ export function LevelOverlay() {
 				</div>
 			)}
 
-			<div className="flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white/95 shadow-lg backdrop-blur">
-				<div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-neutral-100 shrink-0">
-					<div className="min-w-0">
-						<p className="text-[10px] uppercase tracking-wide text-neutral-500">Level</p>
-						<h3 className="text-xs font-semibold text-neutral-800 leading-tight truncate">
-							Penetapan Kadar Tembaga
-						</h3>
+			<div className="flex w-full flex-col overflow-hidden rounded-[18px] border border-neutral-200 bg-white/95 shadow-lg backdrop-blur">
+				{/* Aksen brand solid */}
+				<div className="h-1 w-full bg-primary-500 shrink-0" />
+
+				<div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-neutral-100 shrink-0">
+					<div className="flex min-w-0 items-center gap-2">
+						<span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-500">
+							<ChemistLogomark className="h-4 w-4" />
+						</span>
+						<div className="min-w-0">
+							<p className="text-[10px] uppercase tracking-wide text-primary-500 font-semibold">
+								Level
+							</p>
+							<h3 className="text-xs font-semibold text-neutral-800 leading-tight truncate">
+								Penetapan Kadar Tembaga
+							</h3>
+						</div>
 					</div>
 					<button
 						onClick={() => setExpanded((v) => !v)}
-						className="rounded-lg border border-neutral-200 px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50 shrink-0"
+						className="rounded-lg border border-neutral-200 px-2.5 py-1 text-[11px] font-medium text-neutral-600 hover:bg-neutral-50 active:scale-95 shrink-0"
 					>
 						{expanded ? "Tutup" : "Buka"}
 					</button>
 				</div>
 
-				<div className="px-3 py-2 shrink-0">
+				<div className="px-3 py-2.5 shrink-0">
 					<div className="mb-1.5 flex items-center justify-between text-[11px]">
-						<span className="font-medium text-neutral-700">Progress</span>
+						<span className="font-semibold text-neutral-700">Progress</span>
 						<span className="text-neutral-500">
 							{completedCount}/{level.milestones.length} · {progress}%
 						</span>
 					</div>
-					<div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
+					<div className="h-2 overflow-hidden rounded-full bg-neutral-100">
 						<div
-							className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all"
+							className="h-full rounded-full bg-primary-500 transition-all"
 							style={{ width: `${progress}%` }}
 						/>
 					</div>
-					<div className="mt-1.5 flex items-center justify-between text-[10px]">
-						<span className="text-neutral-500">XP: {level.xp}</span>
-						<span className={`font-semibold ${level.finished ? "text-emerald-600" : "text-neutral-500"}`}>
+					<div className="mt-2 flex items-center justify-between">
+						<span className="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-600">
+							XP {level.xp}
+						</span>
+						<span
+							className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+								level.finished
+									? "bg-emerald-50 text-emerald-600"
+									: "bg-neutral-100 text-neutral-500"
+							}`}
+						>
 							{level.finished ? "Selesai" : "Berjalan"}
 						</span>
 					</div>
@@ -139,7 +161,7 @@ export function LevelOverlay() {
 						<button
 							type="button"
 							onClick={handleReset}
-							className="mt-2 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 active:bg-red-200"
+							className="mt-2.5 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 active:bg-red-200 active:scale-[0.98]"
 						>
 							Reset Praktikum
 						</button>
@@ -154,14 +176,22 @@ export function LevelOverlay() {
 						{level.milestones.map((m) => (
 							<div
 								key={m.step}
-								className={`mb-1 rounded-lg px-2 py-1.5 text-[11px] ${m.completed ? "bg-emerald-50 text-emerald-800" : "bg-neutral-50 text-neutral-600"}`}
+								className={`mb-1 flex items-start gap-2 rounded-lg px-2 py-1.5 text-[11px] ${
+									m.completed
+										? "bg-emerald-50 text-emerald-800"
+										: "bg-neutral-50 text-neutral-600"
+								}`}
 							>
-								<div className="flex items-start gap-2">
-									<span className="mt-0.5 text-[10px] font-bold">
-										{m.completed ? "OK" : m.step}
-									</span>
-									<span className="leading-snug">{m.title}</span>
-								</div>
+								<span
+									className={`mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+										m.completed
+											? "bg-emerald-500 text-white"
+											: "border border-neutral-300 bg-white text-neutral-500"
+									}`}
+								>
+									{m.completed ? "✓" : m.step}
+								</span>
+								<span className="leading-snug">{m.title}</span>
 							</div>
 						))}
 					</div>

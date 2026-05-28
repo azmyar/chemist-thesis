@@ -45,6 +45,11 @@ export function GameCanvas({ roomId }: GameCanvasProps) {
 
 			// Pass roomId to the game registry for scenes to access
 			gameRef.current.registry.set("roomId", roomId);
+
+			// Debug: expose game for e2e testing
+			if (typeof window !== "undefined") {
+				(window as unknown as { __chemistGame?: Phaser.Game }).__chemistGame = gameRef.current;
+			}
 		};
 
 		initGame().catch((error) => {

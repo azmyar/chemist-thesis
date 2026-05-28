@@ -61,8 +61,8 @@ app.get("/rooms", (c) => {
 		data: [
 			{
 				id: "lab-umum",
-				name: "Lab Umum",
-				description: "Laboratorium kimia umum — tempat kumpul bareng",
+				name: "Lab Gravimetri",
+				description: "Penetapan kadar tembaga metode gravimetri",
 				maxPlayers: 20,
 			},
 		],
@@ -80,6 +80,22 @@ app.post("/admin/reset/:roomId", async (c) => {
 	return response;
 });
 
+// ── Export Progres Siswa (penelitian) ─────────────
+// GET /admin/progress/lab-umum            → JSON semua siswa
+// GET /admin/progress/lab-umum?format=csv → CSV (impor ke spreadsheet/SPSS)
+
+app.get("/admin/progress/:roomId", async (c) => {
+	const roomId = c.req.param("roomId");
+	const id = c.env.GAME_ROOM.idFromName(roomId);
+	const stub = c.env.GAME_ROOM.get(id);
+
+	const target = new URL("/progress", c.req.url);
+	const format = c.req.query("format");
+	if (format) target.searchParams.set("format", format);
+
+	return stub.fetch(new Request(target.toString(), { method: "GET" }));
+});
+
 // ── WebSocket Upgrade → Durable Object ────────────
 
 app.get("/room/:roomId", async (c) => {
@@ -94,6 +110,8 @@ app.get("/room/:roomId", async (c) => {
 	if (playerName) {
 		url.searchParams.set("name", playerName);
 	}
+	// Sertakan roomId agar DO bisa mencatatnya ke D1 (penelitian).
+	url.searchParams.set("room", roomId);
 
 	return stub.fetch(new Request(url.toString(), c.req.raw));
 });

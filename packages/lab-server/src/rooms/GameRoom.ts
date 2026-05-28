@@ -9,6 +9,7 @@ import {
 	type HeldItem,
 	type InventoryItem,
 	type LabContainerMeta,
+	type LevelMilestone,
 	type LevelReport,
 	type LevelState,
 	type PlayerState,
@@ -199,9 +200,14 @@ export class GameRoom extends DurableObject {
 	 */
 	private levelStates: Map<string, LevelState> = new Map();
 	private rateWindows: Map<string, RateWindow> = new Map();
+	/** Binding D1 untuk pencatatan progres siswa (penelitian). Opsional —
+	 *  gameplay tetap jalan walau D1 belum dikonfigurasi. */
+	private db: D1Database | undefined;
+	private roomId = "lab-umum";
 
 	constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
 		super(ctx, env);
+		this.db = env.DB;
 		this.rehydratePlayers();
 	}
 
@@ -369,20 +375,44 @@ export class GameRoom extends DurableObject {
 	 * Load (or initialize) a specific player's level state. Called on connect
 	 * and whenever a handler needs to read/write progress for that player.
 	 */
-	private async ensurePlayerLevelState(playerId: string): Promise<LevelState> {
+	private async ensurePlayerLevelState(playerId: string, studentName?: string): Promise<LevelState> {
 		const cached = this.levelStates.get(playerId);
-		if (cached) return cached;
+		if (cached) {
+			// Lengkapi identitas bila record lama belum punya nama/sid.
+			if (this.applyIdentity(cached, playerId, studentName)) {
+				await this.ctx.storage.put(`levelState:${playerId}`, cached);
+			}
+			return cached;
+		}
 
 		const stored = await this.ctx.storage.get<LevelState>(`levelState:${playerId}`);
 		if (stored && Array.isArray(stored.milestones) && stored.milestones.length === 14) {
+			this.applyIdentity(stored, playerId, studentName);
 			this.levelStates.set(playerId, stored);
+			await this.ctx.storage.put(`levelState:${playerId}`, stored);
 			return stored;
 		}
 
 		const fresh = this.createDefaultLevelState();
+		this.applyIdentity(fresh, playerId, studentName);
 		this.levelStates.set(playerId, fresh);
 		await this.ctx.storage.put(`levelState:${playerId}`, fresh);
 		return fresh;
+	}
+
+	/** Catat sid + nama siswa pada level state. Return true bila ada perubahan. */
+	private applyIdentity(state: LevelState, playerId: string, studentName?: string): boolean {
+		let changed = false;
+		if (state.sid !== playerId) {
+			state.sid = playerId;
+			changed = true;
+		}
+		const name = studentName?.trim();
+		if (name && state.studentName !== name) {
+			state.studentName = name;
+			changed = true;
+		}
+		return changed;
 	}
 
 	private async persistObjects(): Promise<void> {
@@ -398,6 +428,129 @@ export class GameRoom extends DurableObject {
 		if (state) {
 			await this.ctx.storage.put(`levelState:${playerId}`, state);
 		}
+	}
+
+	/**
+	 * Rangkum progres seluruh siswa yang tersimpan di storage untuk keperluan
+	 * analisis penelitian (data keterlibatan behavioral & dosage). Satu baris
+	 * per siswa: identitas, XP, jumlah milestone selesai, durasi, dan waktu
+	 * penyelesaian tiap milestone.
+	 */
+	private async exportProgress(): Promise<Array<Record<string, unknown>>> {
+		const stored = await this.ctx.storage.list<LevelState>({ prefix: "levelState:" });
+		const rows: Array<Record<string, unknown>> = [];
+		for (const [key, state] of stored) {
+			if (!state || !Array.isArray(state.milestones)) continue;
+			const sid = state.sid ?? key.replace("levelState:", "");
+			const completed = state.milestones.filter((m) => m.completed);
+			const completionTimes = completed
+				.map((m) => m.completedAt)
+				.filter((t): t is number => typeof t === "number");
+			const lastCompletedAt = completionTimes.length > 0 ? Math.max(...completionTimes) : undefined;
+			const durationMs =
+				lastCompletedAt !== undefined && typeof state.startedAt === "number"
+					? lastCompletedAt - state.startedAt
+					: undefined;
+			rows.push({
+				sid,
+				studentName: state.studentName ?? "",
+				xp: state.xp,
+				finished: state.finished,
+				milestonesCompleted: completed.length,
+				totalMilestones: state.milestones.length,
+				startedAt: state.startedAt,
+				updatedAt: state.updatedAt,
+				durationMs,
+				durationMinutes: durationMs !== undefined ? Math.round(durationMs / 60000) : undefined,
+				milestoneTimestamps: state.milestones.map((m) => ({
+					step: m.step,
+					completed: m.completed,
+					completedAt: m.completedAt ?? null,
+				})),
+			});
+		}
+		// Urutkan: yang paling banyak progres di atas.
+		rows.sort((a, b) => (b.milestonesCompleted as number) - (a.milestonesCompleted as number));
+		return rows;
+	}
+
+	/**
+	 * Tulis snapshot progres siswa ke D1 (upsert satu baris per sid). Dipanggil
+	 * saat siswa connect dan tiap milestone selesai. Best-effort: kegagalan D1
+	 * tidak mengganggu gameplay (dibungkus try/catch + waitUntil).
+	 */
+	private syncProgressToD1(state: LevelState, milestone?: LevelMilestone): void {
+		const db = this.db;
+		if (!db) return;
+		const completed = state.milestones.filter((m) => m.completed).length;
+		// Saat ada milestone baru selesai, tulis sekalian step terakhirnya.
+		// Saat hanya sinkron snapshot tanpa milestone baru, kolom granular
+		// dibiarkan NULL pada bind — ON CONFLICT akan COALESCE supaya nilai
+		// terakhir yg pernah dicatat tidak hilang.
+		const op = (async () => {
+			try {
+				await db
+					.prepare(
+						`INSERT INTO student_progress
+							(sid, student_name, room_id, xp, milestones_completed, total_milestones,
+							 finished, started_at, updated_at,
+							 last_milestone_step, last_milestone_title, last_milestone_at)
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						 ON CONFLICT(sid) DO UPDATE SET
+							student_name = COALESCE(excluded.student_name, student_progress.student_name),
+							room_id = excluded.room_id,
+							xp = excluded.xp,
+							milestones_completed = excluded.milestones_completed,
+							finished = excluded.finished,
+							updated_at = excluded.updated_at,
+							last_milestone_step = COALESCE(excluded.last_milestone_step, student_progress.last_milestone_step),
+							last_milestone_title = COALESCE(excluded.last_milestone_title, student_progress.last_milestone_title),
+							last_milestone_at = COALESCE(excluded.last_milestone_at, student_progress.last_milestone_at)`,
+					)
+					.bind(
+						state.sid ?? "",
+						state.studentName ?? null,
+						this.roomId,
+						state.xp,
+						completed,
+						state.milestones.length,
+						state.finished ? 1 : 0,
+						state.startedAt,
+						state.updatedAt,
+						milestone?.step ?? null,
+						milestone?.title ?? null,
+						milestone?.completedAt ?? null,
+					)
+					.run();
+			} catch (err) {
+				console.error("D1 syncProgress gagal:", err);
+			}
+		})();
+		this.ctx.waitUntil(op);
+	}
+
+	/** Konversi hasil exportProgress() ke CSV (satu baris per siswa). */
+	private progressToCsv(rows: Array<Record<string, unknown>>): string {
+		const header = [
+			"sid",
+			"studentName",
+			"xp",
+			"finished",
+			"milestonesCompleted",
+			"totalMilestones",
+			"startedAt",
+			"updatedAt",
+			"durationMinutes",
+		];
+		const escape = (v: unknown): string => {
+			const s = v === undefined || v === null ? "" : String(v);
+			return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+		};
+		const lines = [header.join(",")];
+		for (const r of rows) {
+			lines.push(header.map((h) => escape(r[h])).join(","));
+		}
+		return lines.join("\n");
 	}
 
 	/** Legacy callsites used to persist both objects + levelState together.
@@ -1432,6 +1585,8 @@ export class GameRoom extends DurableObject {
 		state.finished = state.milestones.every((m) => m.completed);
 
 		await this.persistPlayerLevelState(playerId);
+		// Catat ke D1 (penelitian): satu UPSERT termasuk info milestone terakhir.
+		this.syncProgressToD1(state, milestone);
 		this.sendTo(playerId, { type: "level_state", level: state });
 		return true;
 	}
@@ -1543,6 +1698,26 @@ export class GameRoom extends DurableObject {
 			});
 		}
 
+		// Export progres semua siswa (untuk analisis penelitian).
+		// GET /progress           → JSON
+		// GET /progress?format=csv → CSV (siap impor ke spreadsheet/SPSS)
+		if (url.pathname === "/progress" && request.method === "GET") {
+			const rows = await this.exportProgress();
+			if (url.searchParams.get("format") === "csv") {
+				return new Response(this.progressToCsv(rows), {
+					status: 200,
+					headers: {
+						"Content-Type": "text/csv; charset=utf-8",
+						"Content-Disposition": 'attachment; filename="progress.csv"',
+					},
+				});
+			}
+			return new Response(JSON.stringify({ success: true, count: rows.length, data: rows }, null, 2), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
 		if (url.pathname !== "/ws") {
 			return new Response("Not found", { status: 404 });
 		}
@@ -1599,7 +1774,12 @@ export class GameRoom extends DurableObject {
 		};
 		server.send(JSON.stringify(snapshot));
 
-		const playerLevelState = await this.ensurePlayerLevelState(user.id);
+		const roomFromQuery = url.searchParams.get("room")?.trim();
+		if (roomFromQuery) this.roomId = roomFromQuery;
+
+		const playerLevelState = await this.ensurePlayerLevelState(user.id, user.name);
+		// Catat kehadiran siswa ke D1 (penelitian). Best-effort.
+		this.syncProgressToD1(playerLevelState);
 		server.send(JSON.stringify({ type: "level_state", level: playerLevelState } satisfies ServerMessage));
 
 		this.broadcast({ type: "player_join", player: playerState }, user.id);

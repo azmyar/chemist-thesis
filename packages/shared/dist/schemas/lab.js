@@ -34,6 +34,8 @@ export const labContainerMetaSchema = z.object({
     sulfateTestBaCl2Added: z.boolean().optional(),
     baseTested: z.boolean().optional(),
     dried: z.boolean().optional(),
+    transferredToCrucible: z.boolean().optional(),
+    tekluCharred: z.boolean().optional(),
     calcined: z.boolean().optional(),
     cooled: z.boolean().optional(),
     cuoMassG: z.number().optional(),
@@ -97,6 +99,10 @@ export const levelStateSchema = z.object({
     startedAt: z.number(),
     updatedAt: z.number(),
     lastEvent: z.string().optional(),
+    // Identitas siswa untuk pelacakan progres (penelitian). Nama diisi saat
+    // siswa pertama kali terhubung; sid adalah kunci sesi anonim per perangkat.
+    studentName: z.string().optional(),
+    sid: z.string().optional(),
 });
 // ── Level Report (final summary shown after milestone 14) ────────
 export const reportIssueSchema = z.object({
@@ -135,6 +141,7 @@ export const gameObjectTypeSchema = z.enum([
     "timbangan",
     "oven",
     "furnace",
+    "waste",
 ]);
 export const gameObjectStateSchema = z.object({
     id: z.string(),
@@ -172,6 +179,12 @@ export const clientPlaceItemSchema = z.object({
     type: z.literal("place_item"),
     objectId: z.string(),
     itemId: z.string(),
+});
+export const clientUseHeldOnItemSchema = z.object({
+    type: z.literal("use_held_on_item"),
+    objectId: z.string(),
+    heldItemId: z.string(),
+    targetItemId: z.string(),
 });
 export const clientWeighItemSchema = z.object({
     type: z.literal("weigh_item"),
@@ -225,12 +238,16 @@ export const clientDetachSetupPartSchema = z.object({
     setupItemId: z.string(),
     part: setupDetachPartSchema,
 });
+export const clientResetLevelSchema = z.object({
+    type: z.literal("reset_level"),
+});
 export const clientMessageSchema = z.discriminatedUnion("type", [
     clientMoveSchema,
     clientStopSchema,
     clientChatSchema,
     clientTakeItemSchema,
     clientPlaceItemSchema,
+    clientUseHeldOnItemSchema,
     clientWeighItemSchema,
     clientScoopSampleSchema,
     clientPourItemSchema,
@@ -240,15 +257,16 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     clientDiscardObjectContentsSchema,
     clientDiscardHeldContentsSchema,
     clientDetachSetupPartSchema,
+    clientResetLevelSchema,
 ]);
 // ── Room Config ───────────────────────────────────
 export const ROOM_CONFIG = {
     MAX_PLAYERS: 20,
-    MAP_WIDTH: 896,
-    MAP_HEIGHT: 672,
+    MAP_WIDTH: 736,
+    MAP_HEIGHT: 608,
     TILE_SIZE: 32,
-    MAP_COLS: 28,
-    MAP_ROWS: 21,
+    MAP_COLS: 23,
+    MAP_ROWS: 19,
     PLAYER_SPEED: 120,
 };
 // ── Join Room Schema ──────────────────────────────

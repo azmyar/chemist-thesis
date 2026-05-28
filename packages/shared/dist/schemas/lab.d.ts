@@ -55,6 +55,8 @@ export declare const labContainerMetaSchema: z.ZodObject<{
     sulfateTestBaCl2Added: z.ZodOptional<z.ZodBoolean>;
     baseTested: z.ZodOptional<z.ZodBoolean>;
     dried: z.ZodOptional<z.ZodBoolean>;
+    transferredToCrucible: z.ZodOptional<z.ZodBoolean>;
+    tekluCharred: z.ZodOptional<z.ZodBoolean>;
     calcined: z.ZodOptional<z.ZodBoolean>;
     cooled: z.ZodOptional<z.ZodBoolean>;
     cuoMassG: z.ZodOptional<z.ZodNumber>;
@@ -110,6 +112,8 @@ export declare const labContainerMetaSchema: z.ZodObject<{
     sulfateTestBaCl2Added?: boolean | undefined;
     baseTested?: boolean | undefined;
     dried?: boolean | undefined;
+    transferredToCrucible?: boolean | undefined;
+    tekluCharred?: boolean | undefined;
     calcined?: boolean | undefined;
     cooled?: boolean | undefined;
     cuoMassG?: number | undefined;
@@ -147,6 +151,8 @@ export declare const labContainerMetaSchema: z.ZodObject<{
     sulfateTestBaCl2Added?: boolean | undefined;
     baseTested?: boolean | undefined;
     dried?: boolean | undefined;
+    transferredToCrucible?: boolean | undefined;
+    tekluCharred?: boolean | undefined;
     calcined?: boolean | undefined;
     cooled?: boolean | undefined;
     cuoMassG?: number | undefined;
@@ -214,6 +220,8 @@ export declare const inventoryItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added: z.ZodOptional<z.ZodBoolean>;
         baseTested: z.ZodOptional<z.ZodBoolean>;
         dried: z.ZodOptional<z.ZodBoolean>;
+        transferredToCrucible: z.ZodOptional<z.ZodBoolean>;
+        tekluCharred: z.ZodOptional<z.ZodBoolean>;
         calcined: z.ZodOptional<z.ZodBoolean>;
         cooled: z.ZodOptional<z.ZodBoolean>;
         cuoMassG: z.ZodOptional<z.ZodNumber>;
@@ -269,6 +277,8 @@ export declare const inventoryItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -306,6 +316,8 @@ export declare const inventoryItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -360,6 +372,8 @@ export declare const inventoryItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -414,6 +428,8 @@ export declare const inventoryItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -481,6 +497,8 @@ export declare const heldItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added: z.ZodOptional<z.ZodBoolean>;
         baseTested: z.ZodOptional<z.ZodBoolean>;
         dried: z.ZodOptional<z.ZodBoolean>;
+        transferredToCrucible: z.ZodOptional<z.ZodBoolean>;
+        tekluCharred: z.ZodOptional<z.ZodBoolean>;
         calcined: z.ZodOptional<z.ZodBoolean>;
         cooled: z.ZodOptional<z.ZodBoolean>;
         cuoMassG: z.ZodOptional<z.ZodNumber>;
@@ -536,6 +554,8 @@ export declare const heldItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -573,6 +593,8 @@ export declare const heldItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -626,6 +648,8 @@ export declare const heldItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -679,6 +703,8 @@ export declare const heldItemSchema: z.ZodObject<{
         sulfateTestBaCl2Added?: boolean | undefined;
         baseTested?: boolean | undefined;
         dried?: boolean | undefined;
+        transferredToCrucible?: boolean | undefined;
+        tekluCharred?: boolean | undefined;
         calcined?: boolean | undefined;
         cooled?: boolean | undefined;
         cuoMassG?: number | undefined;
@@ -752,6 +778,8 @@ export declare const levelStateSchema: z.ZodObject<{
     startedAt: z.ZodNumber;
     updatedAt: z.ZodNumber;
     lastEvent: z.ZodOptional<z.ZodString>;
+    studentName: z.ZodOptional<z.ZodString>;
+    sid: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     title: string;
     levelId: string;
@@ -767,6 +795,8 @@ export declare const levelStateSchema: z.ZodObject<{
     startedAt: number;
     updatedAt: number;
     lastEvent?: string | undefined;
+    studentName?: string | undefined;
+    sid?: string | undefined;
 }, {
     title: string;
     levelId: string;
@@ -782,6 +812,8 @@ export declare const levelStateSchema: z.ZodObject<{
     startedAt: number;
     updatedAt: number;
     lastEvent?: string | undefined;
+    studentName?: string | undefined;
+    sid?: string | undefined;
 }>;
 export type LevelState = z.infer<typeof levelStateSchema>;
 export declare const reportIssueSchema: z.ZodObject<{
@@ -910,6 +942,8 @@ export declare const playerStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added: z.ZodOptional<z.ZodBoolean>;
             baseTested: z.ZodOptional<z.ZodBoolean>;
             dried: z.ZodOptional<z.ZodBoolean>;
+            transferredToCrucible: z.ZodOptional<z.ZodBoolean>;
+            tekluCharred: z.ZodOptional<z.ZodBoolean>;
             calcined: z.ZodOptional<z.ZodBoolean>;
             cooled: z.ZodOptional<z.ZodBoolean>;
             cuoMassG: z.ZodOptional<z.ZodNumber>;
@@ -965,6 +999,8 @@ export declare const playerStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1002,6 +1038,8 @@ export declare const playerStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1055,6 +1093,8 @@ export declare const playerStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1108,6 +1148,8 @@ export declare const playerStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1170,6 +1212,8 @@ export declare const playerStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1232,6 +1276,8 @@ export declare const playerStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1259,11 +1305,11 @@ export declare const playerStateSchema: z.ZodObject<{
     }[];
 }>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
-export declare const gameObjectTypeSchema: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan", "oven", "furnace"]>;
+export declare const gameObjectTypeSchema: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan", "oven", "furnace", "waste"]>;
 export type GameObjectType = z.infer<typeof gameObjectTypeSchema>;
 export declare const gameObjectStateSchema: z.ZodObject<{
     id: z.ZodString;
-    objectType: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan", "oven", "furnace"]>;
+    objectType: z.ZodEnum<["workbench", "storage", "reagent_table", "timbangan", "oven", "furnace", "waste"]>;
     items: z.ZodArray<z.ZodObject<{
         itemId: z.ZodString;
         baseItemId: z.ZodOptional<z.ZodString>;
@@ -1306,6 +1352,8 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added: z.ZodOptional<z.ZodBoolean>;
             baseTested: z.ZodOptional<z.ZodBoolean>;
             dried: z.ZodOptional<z.ZodBoolean>;
+            transferredToCrucible: z.ZodOptional<z.ZodBoolean>;
+            tekluCharred: z.ZodOptional<z.ZodBoolean>;
             calcined: z.ZodOptional<z.ZodBoolean>;
             cooled: z.ZodOptional<z.ZodBoolean>;
             cuoMassG: z.ZodOptional<z.ZodNumber>;
@@ -1361,6 +1409,8 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1398,6 +1448,8 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1452,6 +1504,8 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1506,6 +1560,8 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1533,7 +1589,7 @@ export declare const gameObjectStateSchema: z.ZodObject<{
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     id: string;
-    objectType: "workbench" | "storage" | "reagent_table" | "timbangan" | "oven" | "furnace";
+    objectType: "workbench" | "storage" | "reagent_table" | "timbangan" | "oven" | "furnace" | "waste";
     items: {
         name: string;
         itemId: string;
@@ -1564,6 +1620,8 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1591,7 +1649,7 @@ export declare const gameObjectStateSchema: z.ZodObject<{
     }[];
 }, {
     id: string;
-    objectType: "workbench" | "storage" | "reagent_table" | "timbangan" | "oven" | "furnace";
+    objectType: "workbench" | "storage" | "reagent_table" | "timbangan" | "oven" | "furnace" | "waste";
     items: {
         name: string;
         itemId: string;
@@ -1622,6 +1680,8 @@ export declare const gameObjectStateSchema: z.ZodObject<{
             sulfateTestBaCl2Added?: boolean | undefined;
             baseTested?: boolean | undefined;
             dried?: boolean | undefined;
+            transferredToCrucible?: boolean | undefined;
+            tekluCharred?: boolean | undefined;
             calcined?: boolean | undefined;
             cooled?: boolean | undefined;
             cuoMassG?: number | undefined;
@@ -1723,6 +1783,22 @@ export declare const clientPlaceItemSchema: z.ZodObject<{
     itemId: string;
     objectId: string;
 }>;
+export declare const clientUseHeldOnItemSchema: z.ZodObject<{
+    type: z.ZodLiteral<"use_held_on_item">;
+    objectId: z.ZodString;
+    heldItemId: z.ZodString;
+    targetItemId: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "use_held_on_item";
+    objectId: string;
+    heldItemId: string;
+    targetItemId: string;
+}, {
+    type: "use_held_on_item";
+    objectId: string;
+    heldItemId: string;
+    targetItemId: string;
+}>;
 export declare const clientWeighItemSchema: z.ZodObject<{
     type: z.ZodLiteral<"weigh_item">;
     transferGrams: z.ZodNumber;
@@ -1754,14 +1830,14 @@ export declare const clientPourItemSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     type: "pour_item";
     objectId: string;
-    sourceItemId: string;
     targetItemId: string;
+    sourceItemId: string;
     transferMl: number;
 }, {
     type: "pour_item";
     objectId: string;
-    sourceItemId: string;
     targetItemId: string;
+    sourceItemId: string;
     transferMl: number;
 }>;
 export declare const clientDissolveItemSchema: z.ZodObject<{
@@ -1850,6 +1926,13 @@ export declare const clientDetachSetupPartSchema: z.ZodObject<{
     setupItemId: string;
     part: "filter" | "receiver" | "all";
 }>;
+export declare const clientResetLevelSchema: z.ZodObject<{
+    type: z.ZodLiteral<"reset_level">;
+}, "strip", z.ZodTypeAny, {
+    type: "reset_level";
+}, {
+    type: "reset_level";
+}>;
 export declare const clientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     type: z.ZodLiteral<"move">;
     x: z.ZodNumber;
@@ -1920,6 +2003,21 @@ export declare const clientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.Zod
     itemId: string;
     objectId: string;
 }>, z.ZodObject<{
+    type: z.ZodLiteral<"use_held_on_item">;
+    objectId: z.ZodString;
+    heldItemId: z.ZodString;
+    targetItemId: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "use_held_on_item";
+    objectId: string;
+    heldItemId: string;
+    targetItemId: string;
+}, {
+    type: "use_held_on_item";
+    objectId: string;
+    heldItemId: string;
+    targetItemId: string;
+}>, z.ZodObject<{
     type: z.ZodLiteral<"weigh_item">;
     transferGrams: z.ZodNumber;
 }, "strip", z.ZodTypeAny, {
@@ -1943,14 +2041,14 @@ export declare const clientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.Zod
 }, "strip", z.ZodTypeAny, {
     type: "pour_item";
     objectId: string;
-    sourceItemId: string;
     targetItemId: string;
+    sourceItemId: string;
     transferMl: number;
 }, {
     type: "pour_item";
     objectId: string;
-    sourceItemId: string;
     targetItemId: string;
+    sourceItemId: string;
     transferMl: number;
 }>, z.ZodObject<{
     type: z.ZodLiteral<"dissolve_item">;
@@ -2030,6 +2128,12 @@ export declare const clientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.Zod
     objectId: string;
     setupItemId: string;
     part: "filter" | "receiver" | "all";
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"reset_level">;
+}, "strip", z.ZodTypeAny, {
+    type: "reset_level";
+}, {
+    type: "reset_level";
 }>]>;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ServerMessage = {
@@ -2085,11 +2189,11 @@ export type ServerMessage = {
 };
 export declare const ROOM_CONFIG: {
     readonly MAX_PLAYERS: 20;
-    readonly MAP_WIDTH: 896;
-    readonly MAP_HEIGHT: 672;
+    readonly MAP_WIDTH: 736;
+    readonly MAP_HEIGHT: 608;
     readonly TILE_SIZE: 32;
-    readonly MAP_COLS: 28;
-    readonly MAP_ROWS: 21;
+    readonly MAP_COLS: 23;
+    readonly MAP_ROWS: 19;
     readonly PLAYER_SPEED: 120;
 };
 export declare const joinRoomSchema: z.ZodObject<{

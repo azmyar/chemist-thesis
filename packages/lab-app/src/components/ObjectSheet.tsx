@@ -1,24 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import {
 	DndContext,
-	DragOverlay,
-	PointerSensor,
 	useDraggable,
 	useDroppable,
+	MouseSensor,
+	TouchSensor,
 	useSensor,
 	useSensors,
+	closestCenter,
 	type DragEndEvent,
-	type DragStartEvent,
-	type Modifier,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { gameClient } from "@/lib/network/client";
 import type { GameObjectType, HeldItem, InventoryItem } from "@/lib/protocol";
 import { PROCESS_DURATIONS, PROCESS_LABELS, slowSend } from "@/lib/slowSend";
 import { WorkbenchSheet } from "./workbench/WorkbenchSheet";
+
+// ────────────────────────────────────────────────────────────────────────────
+// REWRITE: ObjectSheet konsisten dengan WorkbenchSheet — drag-and-drop dengan
+// tangan di SAMPING KANAN.
+//
+// Variant:
+//   - workbench   → delegate ke WorkbenchSheet
+//   - storage / reagent_table / oven / furnace → object panel (kiri scroll y)
+//                  + hand panel (kanan fixed). Drag object→hand = take.
+//                  Drag hand→object = place (slowSend oven/furnace).
+//   - waste       → disposal zone (kiri) + hand (kanan). Drag hand→disposal.
+//   - timbangan   → weigh widget (kiri) + hand (kanan, drag-readonly).
+// ────────────────────────────────────────────────────────────────────────────
 
 const OBJECT_LABELS: Record<GameObjectType, string> = {
 	workbench: "Meja Kerja",
@@ -69,33 +80,18 @@ const ITEM_EMOJI: Record<string, string> = {
 };
 
 function contentKind(itemId: string): string {
-	const separator = itemId.indexOf("::");
-	return separator === -1 ? itemId : itemId.slice(0, separator);
+	const sep = itemId.indexOf("::");
+	return sep === -1 ? itemId : itemId.slice(0, sep);
 }
 
 function getItemKind(item: InventoryItem | HeldItem): string {
 	return item.baseItemId ?? contentKind(item.itemId);
 }
 
-const centerDragOverlay: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
-	if (!(activatorEvent instanceof PointerEvent) || !draggingNodeRect) return transform;
-
-	const offsetX = activatorEvent.clientX - draggingNodeRect.left;
-	const offsetY = activatorEvent.clientY - draggingNodeRect.top;
-
-	return {
-		...transform,
-		x: transform.x + offsetX - draggingNodeRect.width / 2,
-		y: transform.y + offsetY - draggingNodeRect.height / 2,
-	};
-};
-
 function formatMeasurement(item: InventoryItem | HeldItem): string {
 	const parts: string[] = [];
-	if (item.weightGrams !== undefined && item.weightGrams > 0)
-		parts.push(`${item.weightGrams}g`);
-	if (item.volumeMl !== undefined && item.volumeMl > 0)
-		parts.push(`${item.volumeMl}mL`);
+	if (item.weightGrams !== undefined && item.weightGrams > 0) parts.push(`${item.weightGrams}g`);
+	if (item.volumeMl !== undefined && item.volumeMl > 0) parts.push(`${item.volumeMl}mL`);
 	if (item.contents && item.contents.length > 0) {
 		const inner = item.contents
 			.map((c) => {
@@ -114,6 +110,8 @@ function formatMeasurement(item: InventoryItem | HeldItem): string {
 	return parts.join(" · ");
 }
 
+// ── Draggable card (object panel + hand) ──────────────────────────────────
+
 function DraggableObjectCard({
 	id,
 	item,
@@ -125,13 +123,17 @@ function DraggableObjectCard({
 }) {
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id,
-		data: { item, itemId: item.itemId, source: variant },
+		data: { item, source: variant, itemId: item.itemId },
 	});
 	const style = {
-		transform: isDragging ? undefined : CSS.Translate.toString(transform),
+		transform: CSS.Translate.toString(transform),
 		zIndex: isDragging ? 999 : undefined,
-		opacity: isDragging ? 0.35 : 1,
+		opacity: isDragging ? 0.85 : 1,
 	};
+	const kind = getItemKind(item);
+	const size = variant === "object" ? "w-[116px] h-[108px]" : "w-[96px] h-[88px]";
+	const tone =
+		variant === "object" ? "border-neutral-200 text-neutral-700" : "border-amber-200 text-amber-800";
 
 	return (
 		<div
@@ -139,43 +141,23 @@ function DraggableObjectCard({
 			style={style}
 			{...listeners}
 			{...attributes}
-			className={isDragging ? "" : "cursor-grab active:cursor-grabbing"}
-		>
-			<ObjectCardBody item={item} variant={variant} isDragging={isDragging} />
-		</div>
-	);
-}
-
-function ObjectCardBody({
-	item,
-	variant,
-	isDragging = false,
-}: {
-	item: InventoryItem | HeldItem;
-	variant: "object" | "hand";
-	isDragging?: boolean;
-}) {
-	const kind = getItemKind(item);
-	const size = variant === "object" ? "w-[128px] h-[120px]" : "w-[112px] h-[96px]";
-	const tone = variant === "object" ? "border-neutral-200 text-neutral-700" : "border-amber-200 text-amber-800";
-
-	return (
-		<div
-			className={`relative flex flex-col items-center justify-center rounded-xl border bg-white shadow-sm select-none touch-none ${size} ${tone} ${isDragging ? "shadow-lg ring-2 ring-blue-400" : ""}`}
+			className={`relative flex flex-col items-center justify-center rounded-xl border bg-white shadow-sm select-none touch-none ${size} ${tone} ${
+				isDragging ? "shadow-lg ring-2 ring-primary-400" : "cursor-grab active:cursor-grabbing"
+			}`}
 		>
 			{"quantity" in item && item.quantity > 1 && (
 				<span className="absolute right-1 top-1 rounded bg-neutral-100 px-1 py-0.5 text-[9px] font-semibold text-neutral-500">
 					x{item.quantity}
 				</span>
 			)}
-			<span className={variant === "object" ? "text-2xl" : "text-xl"}>
+			<span className={variant === "object" ? "text-xl" : "text-lg"}>
 				{ITEM_EMOJI[kind] ?? "📦"}
 			</span>
 			<span className="mt-1 w-full px-1 text-center text-[10px] leading-tight whitespace-normal break-words">
 				{item.name}
 			</span>
 			{formatMeasurement(item) && (
-				<span className={`mt-1 w-full px-1 text-center text-[9px] leading-tight whitespace-normal break-words ${variant === "object" ? "text-neutral-400" : "text-amber-500"}`}>
+				<span className={`mt-0.5 w-full px-1 text-center text-[9px] leading-tight whitespace-normal break-words ${variant === "object" ? "text-neutral-400" : "text-amber-500"}`}>
 					{formatMeasurement(item)}
 				</span>
 			)}
@@ -183,22 +165,91 @@ function ObjectCardBody({
 	);
 }
 
-function DroppablePanel({
-	id,
+// ── Droppable zones ───────────────────────────────────────────────────────
+
+function ObjectPanel({
+	label,
+	hint,
 	children,
-	className,
+	tone = "neutral",
+	highlight,
 }: {
-	id: string;
-	children: ReactNode;
-	className: string;
+	label: string;
+	hint?: string;
+	children: React.ReactNode;
+	tone?: "neutral" | "rose";
+	highlight: boolean;
 }) {
-	const { setNodeRef, isOver } = useDroppable({ id });
+	const { setNodeRef, isOver } = useDroppable({ id: "drop-object", data: { type: "object" } });
+	const base =
+		tone === "rose"
+			? "border-rose-200 bg-rose-50/40"
+			: "border-neutral-200 bg-neutral-50";
+	const active = isOver
+		? "ring-2 ring-primary-400 border-primary-300"
+		: highlight
+			? "border-primary-300"
+			: "";
 	return (
-		<div ref={setNodeRef} className={`${className} ${isOver ? "ring-2 ring-blue-400" : ""}`}>
+		<div ref={setNodeRef} className={`flex-1 min-w-0 min-h-0 flex flex-col rounded-2xl border-2 border-dashed transition-all ${base} ${active}`}>
+			<div className="px-3 pt-2 pb-1 shrink-0 flex items-center justify-between">
+				<p className={`text-[10px] uppercase tracking-wide font-semibold ${tone === "rose" ? "text-rose-600" : "text-neutral-500"}`}>{label}</p>
+				{hint && <p className="text-[10px] text-neutral-400">{hint}</p>}
+			</div>
+			<div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-2 pb-2">
+				{children}
+			</div>
+		</div>
+	);
+}
+
+function WasteDisposalZone() {
+	const { setNodeRef, isOver } = useDroppable({ id: "drop-waste-disposal", data: { type: "disposal" } });
+	return (
+		<div
+			ref={setNodeRef}
+			className={`flex-1 min-h-0 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center p-4 transition-all ${
+				isOver ? "bg-rose-100 border-rose-400 ring-2 ring-rose-300" : "bg-rose-50/40 border-rose-200"
+			}`}
+		>
+			<p className="text-4xl">🛢️</p>
+			<p className="mt-2 text-sm font-semibold text-rose-700">Buang ke sini</p>
+			<p className="mt-0.5 text-[11px] text-rose-500 text-center px-2">
+				Geser wadah dari tangan ke sini — wadah tetap di tangan, isinya dibuang
+			</p>
+		</div>
+	);
+}
+
+function HandPanel({
+	holding,
+	highlight,
+	children,
+}: {
+	holding: HeldItem[];
+	highlight: boolean;
+	children: React.ReactNode;
+}) {
+	const { setNodeRef, isOver } = useDroppable({ id: "drop-hand", data: { type: "hand" } });
+	const dynamic = isOver
+		? "bg-amber-100 border-amber-400"
+		: highlight
+			? "bg-amber-100/60 border-amber-300"
+			: "bg-amber-50 border-amber-200";
+	return (
+		<div
+			ref={setNodeRef}
+			className={`shrink-0 flex flex-col items-center gap-2 w-[120px] p-2 rounded-2xl border-2 transition-colors touch-none ${dynamic}`}
+		>
+			<p className="text-[10px] uppercase tracking-wide font-semibold text-amber-600 mt-0.5">
+				Tangan {holding.length}/2
+			</p>
 			{children}
 		</div>
 	);
 }
+
+// ── Main ──────────────────────────────────────────────────────────────────
 
 export function ObjectSheet() {
 	const [open, setOpen] = useState(false);
@@ -206,16 +257,9 @@ export function ObjectSheet() {
 	const [objectType, setObjectType] = useState<GameObjectType | null>(null);
 	const [holding, setHolding] = useState<HeldItem[]>([]);
 	const [weighGrams, setWeighGrams] = useState("");
-	const [recordMassG, setRecordMassG] = useState("");
-	const [activeDrag, setActiveDrag] = useState<{
-		item: InventoryItem | HeldItem;
-		variant: "object" | "hand";
-	} | null>(null);
+	const [, setRecordMassG] = useState("");
+	const [isDragging, setIsDragging] = useState(false);
 	const weighInputRef = useRef<HTMLInputElement>(null);
-	const pointerSensor = useSensor(PointerSensor, {
-		activationConstraint: { distance: 6 },
-	});
-	const sensors = useSensors(pointerSensor);
 
 	const [objectItems, setObjectItems] = useState<Record<string, InventoryItem[]>>({});
 	const currentItems = objectId ? objectItems[objectId] ?? [] : [];
@@ -228,16 +272,13 @@ export function ObjectSheet() {
 			setRecordMassG("");
 			setOpen(true);
 		}) as EventListener;
-
 		const onItemsChanged = ((e: CustomEvent) => {
 			const { objectId: id, items } = e.detail;
 			setObjectItems((prev) => ({ ...prev, [id]: items }));
 		}) as EventListener;
-
 		const onHoldChanged = ((e: CustomEvent) => {
 			setHolding(e.detail.holding ?? []);
 		}) as EventListener;
-
 		window.addEventListener("object-interact", onInteract);
 		window.addEventListener("object-items-changed", onItemsChanged);
 		window.addEventListener("local-hold-changed", onHoldChanged);
@@ -246,6 +287,12 @@ export function ObjectSheet() {
 			window.removeEventListener("object-items-changed", onItemsChanged);
 			window.removeEventListener("local-hold-changed", onHoldChanged);
 		};
+	}, []);
+
+	const handleClose = useCallback(() => {
+		setOpen(false);
+		setObjectId(null);
+		setObjectType(null);
 	}, []);
 
 	const handleTake = useCallback(
@@ -273,33 +320,6 @@ export function ObjectSheet() {
 		[objectId, objectType],
 	);
 
-	const handleDragStart = useCallback((event: DragStartEvent) => {
-		const item = event.active.data.current?.item as InventoryItem | HeldItem | undefined;
-		const source = event.active.data.current?.source as "object" | "hand" | undefined;
-		if (!item || !source) return;
-		setActiveDrag({ item, variant: source });
-	}, []);
-
-	const handleDragEnd = useCallback(
-		(event: DragEndEvent) => {
-			setActiveDrag(null);
-			const activeItemId = event.active.data.current?.itemId as string | undefined;
-			const source = event.active.data.current?.source as "object" | "hand" | undefined;
-			const overId = event.over ? String(event.over.id) : "";
-			if (!activeItemId || !source || !overId) return;
-
-			if (source === "object" && overId === "drop-hand") {
-				handleTake(activeItemId);
-				return;
-			}
-
-			if (objectType !== "timbangan" && source === "hand" && overId === "drop-object") {
-				handlePlace(activeItemId);
-			}
-		},
-		[handlePlace, handleTake, objectType],
-	);
-
 	const handleWeigh = useCallback(() => {
 		const grams = parseFloat(weighGrams);
 		if (Number.isNaN(grams) || grams <= 0) return;
@@ -315,26 +335,6 @@ export function ObjectSheet() {
 		gameClient.send({ type: "discard_held_contents", itemId });
 	}, []);
 
-	const handleRecordMass = useCallback(
-		(containerItemId: string) => {
-			const grams = parseFloat(recordMassG);
-			if (Number.isNaN(grams) || grams <= 0) return;
-			gameClient.send({
-				type: "record_mass",
-				containerItemId,
-				measuredMassG: grams,
-			});
-			setRecordMassG("");
-		},
-		[recordMassG],
-	);
-
-	const handleClose = useCallback(() => {
-		setOpen(false);
-		setObjectId(null);
-		setObjectType(null);
-	}, []);
-
 	useEffect(() => {
 		if (!open) return;
 		const onKey = (e: KeyboardEvent) => {
@@ -344,9 +344,47 @@ export function ObjectSheet() {
 		return () => window.removeEventListener("keydown", onKey);
 	}, [open, handleClose]);
 
+	// Sensors — match WorkbenchSheet
+	const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 6 } });
+	const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } });
+	const sensors = useSensors(mouseSensor, touchSensor);
+
+	const handleDragEnd = useCallback(
+		(event: DragEndEvent) => {
+			setIsDragging(false);
+			const itemId = event.active.data.current?.itemId as string | undefined;
+			const source = event.active.data.current?.source as "object" | "hand" | undefined;
+			const overId = event.over ? String(event.over.id) : "";
+			if (!itemId || !source || !overId) return;
+			// object → hand : take
+			if (source === "object" && overId === "drop-hand") {
+				handleTake(itemId);
+				return;
+			}
+			// hand → object : place (blocked for timbangan; rejected gracefully)
+			if (source === "hand" && overId === "drop-object" && objectType !== "timbangan") {
+				handlePlace(itemId);
+				return;
+			}
+			// hand → disposal (waste variant)
+			if (source === "hand" && overId === "drop-waste-disposal" && objectType === "waste") {
+				const held = holding.find((h) => h.itemId === itemId);
+				if (!held) return;
+				const kind = contentKind(held.itemId);
+				const canDiscard =
+					held.category === "alat" &&
+					(held.maxVolumeMl !== undefined || kind === "corong-stand") &&
+					(held.contents ?? []).length > 0;
+				if (canDiscard) handleDiscardHeld(itemId);
+				return;
+			}
+		},
+		[handleTake, handlePlace, handleDiscardHeld, objectType, holding],
+	);
+
 	if (!open) return null;
 
-	// Workbench uses its own drag-and-drop sheet
+	// Workbench: delegate
 	if (objectType === "workbench" && objectId) {
 		return (
 			<WorkbenchSheet
@@ -358,75 +396,8 @@ export function ObjectSheet() {
 		);
 	}
 
-	// Waste container — drag-from-hand-to-dropzone disposal UI.
-	if (objectType === "waste") {
-		const canDiscard = (item: HeldItem) => {
-			if (item.category !== "alat") return false;
-			const k = contentKind(item.itemId);
-			return item.maxVolumeMl !== undefined || k === "corong-stand";
-		};
-		const onWasteDragEnd = (event: DragEndEvent) => {
-			setActiveDrag(null);
-			const itemId = event.active.data.current?.itemId as string | undefined;
-			const source = event.active.data.current?.source as "object" | "hand" | undefined;
-			const overId = event.over ? String(event.over.id) : "";
-			if (!itemId || source !== "hand" || overId !== "drop-waste-disposal") return;
-			const held = holding.find((h) => h.itemId === itemId);
-			if (!held || !canDiscard(held) || (held.contents ?? []).length === 0) return;
-			handleDiscardHeld(itemId);
-		};
-		return (
-			<>
-				<div className="fixed inset-0 bg-black/30 z-40" onClick={handleClose} />
-				<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ touchAction: "none" }}>
-					<div
-						className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex min-h-0 flex-col"
-						style={{ height: "min(60dvh, 520px)", maxHeight: "calc(100dvh - 2rem)" }}
-					>
-						<div className="flex justify-center pt-3 pb-1 shrink-0">
-							<div className="w-12 h-1.5 rounded-full bg-neutral-300 cursor-pointer" onClick={handleClose} />
-						</div>
-						<div className="px-5 pb-2 shrink-0">
-							<h2 className="text-lg font-semibold text-rose-700">🗑️ Pembuangan</h2>
-							<p className="text-xs text-neutral-400">Drag wadah dari tangan ke zona pembuangan untuk mengosongkan isinya.</p>
-						</div>
-						<DndContext
-							sensors={sensors}
-							onDragStart={handleDragStart}
-							onDragEnd={onWasteDragEnd}
-							onDragCancel={() => setActiveDrag(null)}
-							autoScroll={false}
-						>
-							<DroppablePanel
-								id="drop-waste-disposal"
-								className="mx-4 mt-2 mb-3 flex-1 min-h-[140px] rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-4 flex flex-col items-center justify-center transition-colors"
-							>
-								<p className="text-3xl">🛢️</p>
-								<p className="mt-2 text-sm font-semibold text-rose-700">Buang ke sini</p>
-								<p className="mt-0.5 text-[11px] text-rose-500">Wadah tetap di tangan, isinya dibuang</p>
-							</DroppablePanel>
-							<div className="workbench-hand mx-4 mb-4 p-3 rounded-2xl border-2 flex shrink-0 gap-2 min-h-[112px] select-none overflow-x-auto bg-amber-50 border-amber-200">
-								<div className="text-xs text-amber-400 self-center mr-1 shrink-0">🤲</div>
-								{holding.length === 0 && (
-									<p className="text-xs text-amber-300 self-center">Tangan kosong</p>
-								)}
-								{holding.map((item, index) => (
-									<DraggableObjectCard
-										key={`${item.itemId}-${index}`}
-										id={`hand-${item.itemId}-${index}`}
-										item={item}
-										variant="hand"
-									/>
-								))}
-							</div>
-						</DndContext>
-					</div>
-				</div>
-			</>
-		);
-	}
-
 	const isTimbangan = objectType === "timbangan";
+	const isWaste = objectType === "waste";
 	const heldBahan = holding.find((h) => h.category === "bahan" && (h.weightGrams ?? 0) > 0);
 	const heldContainer = holding.find((h) => h.category === "alat" && h.maxVolumeMl !== undefined);
 	const heldCuoContainer = holding.find(
@@ -437,9 +408,6 @@ export function ObjectSheet() {
 	const cuoBalanceReadingG = heldCuoContainer?.labMeta?.cuoMassG;
 	const canWeigh = isTimbangan && !!heldBahan && !!heldContainer;
 	const canRecordMass = isTimbangan && !!heldCuoContainer && cuoBalanceReadingG !== undefined;
-
-	// Step 1 — Open-world weighing advisories for terusi sample.
-	// Scoop-based interaction; server accepts any cumulative mass.
 	const weighingTerusi = canWeigh && contentKind(heldBahan!.itemId) === "terusi";
 	const containerKindForWeigh = heldContainer ? contentKind(heldContainer.itemId) : null;
 	const alreadyInContainerG = weighingTerusi
@@ -450,54 +418,76 @@ export function ObjectSheet() {
 		: 0;
 	const nonCanonicalContainer = weighingTerusi && containerKindForWeigh !== "kaca-arloji";
 	const availableItems = currentItems.filter((i) => i.quantity > 0);
+	const handFull = holding.length >= 2;
 
 	return (
 		<>
 			<div className="fixed inset-0 bg-black/30 z-40" onClick={handleClose} />
-
 			<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
 				<div
-					className="pointer-events-auto w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex flex-col"
-					style={{ maxHeight: "min(85dvh, 720px)" }}
+					className="pointer-events-auto w-full max-w-lg bg-white rounded-t-3xl shadow-xl animate-slide-up flex min-h-0 flex-col"
+					style={{ maxHeight: "85dvh" }}
 				>
-					<div className="flex justify-center pt-3 pb-2 shrink-0">
+					<div className="flex justify-center pt-2 pb-2 shrink-0">
 						<div className="w-12 h-1.5 rounded-full bg-neutral-300 cursor-pointer" onClick={handleClose} />
 					</div>
-
-					<div
-						className="px-6 pb-8 overflow-y-auto"
-						style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom, 2rem))" }}
-					>
-						<h2 className="text-lg font-semibold text-neutral-800 mb-0.5">
-							{objectType ? OBJECT_LABELS[objectType] : "Object"}
+					<div className="px-4 pb-3 shrink-0">
+						<h2 className={`heading-1 ${isWaste ? "text-rose-700" : "text-neutral-800"}`}>
+							{isWaste && "🗑️ "}{objectType ? OBJECT_LABELS[objectType] : "Objek"}
 						</h2>
-						<p className="text-sm text-neutral-500 mb-4">
-							{objectType ? OBJECT_DESC[objectType] : ""}
+						<p className="body-4 text-neutral-500 mt-0.5">
+							{isTimbangan
+								? "Pegang wadah + bahan padat, lalu timbang."
+								: isWaste
+									? "Geser wadah dari tangan ke zona pembuangan."
+									: "Geser item dari objek ke tangan, atau dari tangan ke objek."}
 						</p>
+					</div>
 
-						<DndContext
-							sensors={sensors}
-							onDragStart={handleDragStart}
-							onDragEnd={handleDragEnd}
-							onDragCancel={() => setActiveDrag(null)}
-						>
-							{!isTimbangan && (
-								<DroppablePanel
-									id="drop-object"
-									className="mb-4 min-h-[180px] rounded-2xl border-2 border-dashed border-neutral-200 bg-neutral-50 p-3 transition-all"
+					<DndContext
+						sensors={sensors}
+						collisionDetection={closestCenter}
+						onDragStart={() => setIsDragging(true)}
+						onDragCancel={() => setIsDragging(false)}
+						onDragEnd={handleDragEnd}
+						autoScroll={{ threshold: { x: 0, y: 0.15 }, acceleration: 8 }}
+					>
+						<div className="flex flex-1 min-h-0 gap-2 px-3 pb-3">
+							{/* LEFT: object panel / waste disposal / timbangan widget */}
+							{isWaste ? (
+								<WasteDisposalZone />
+							) : isTimbangan ? (
+								<TimbanganWidget
+									canWeigh={canWeigh}
+									weighingTerusi={weighingTerusi}
+									heldBahan={heldBahan}
+									heldContainer={heldContainer}
+									heldCuoContainer={heldCuoContainer}
+									cuoBalanceReadingG={cuoBalanceReadingG}
+									canRecordMass={canRecordMass}
+									alreadyInContainerG={alreadyInContainerG}
+									nonCanonicalContainer={nonCanonicalContainer}
+									weighGrams={weighGrams}
+									setWeighGrams={setWeighGrams}
+									weighInputRef={weighInputRef}
+									handleScoop={handleScoop}
+									handleWeigh={handleWeigh}
+									handleClose={handleClose}
+									handleDiscardHeld={handleDiscardHeld}
+									setRecordMassG={setRecordMassG}
+								/>
+							) : (
+								<ObjectPanel
+									label={objectType ? OBJECT_LABELS[objectType] : "Objek"}
+									hint={isDragging ? "Lepas di sini untuk taruh" : "Geser ke tangan"}
+									highlight={isDragging}
 								>
-									<div className="mb-2 flex items-center justify-between">
-										<p className="text-xs font-semibold text-neutral-500">
-											{objectType ? OBJECT_LABELS[objectType] : "Objek"}
-										</p>
-										<p className="text-[10px] text-neutral-400">Drop item dari tangan ke sini</p>
-									</div>
 									{availableItems.length === 0 ? (
-										<p className="flex min-h-[112px] items-center justify-center text-sm text-neutral-300">
+										<p className="flex h-32 items-center justify-center text-sm text-neutral-400">
 											Kosong
 										</p>
 									) : (
-										<div className="flex max-h-[260px] flex-wrap content-start gap-3 overflow-y-auto pb-1">
+										<div className="flex flex-wrap gap-2 content-start py-1">
 											{availableItems.map((item) => (
 												<DraggableObjectCard
 													key={item.itemId}
@@ -508,198 +498,229 @@ export function ObjectSheet() {
 											))}
 										</div>
 									)}
-								</DroppablePanel>
+								</ObjectPanel>
 							)}
 
-							{isTimbangan && (
-								<>
-									{canWeigh && weighingTerusi ? (
-										<div className="mb-4 px-3 py-3 rounded-xl bg-green-50 border border-green-200">
-											<p className="text-[11px] text-green-700/80 uppercase tracking-wide">
-												Neraca Analitik
-											</p>
-											<div className="mt-1 flex items-baseline gap-2">
-												<span
-													className={`font-mono text-3xl font-semibold tabular-nums ${
-														alreadyInContainerG >= 0.45 && alreadyInContainerG <= 0.55
-															? "text-emerald-700"
-															: alreadyInContainerG > 0
-																? "text-amber-700"
-																: "text-neutral-400"
-													}`}
-												>
-													{alreadyInContainerG.toFixed(4)}
-												</span>
-												<span className="text-sm text-neutral-500">g</span>
-											</div>
-											<p className="mt-0.5 text-[11px] text-green-700/70">
-												{heldContainer!.name} · sumber: {heldBahan!.name} ({heldBahan!.weightGrams}g tersisa)
-											</p>
-
-											<div className="mt-3 grid grid-cols-2 gap-2">
-												<button
-													onClick={handleScoop}
-													disabled={(heldBahan!.weightGrams ?? 0) <= 0}
-													className="col-span-2 px-3 py-2.5 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 active:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-												>
-													🥄 Ambil sedikit sampel
-												</button>
-												<button
-													onClick={() => handleDiscardHeld(heldContainer!.itemId)}
-													disabled={alreadyInContainerG <= 0}
-													className="px-3 py-2 rounded-lg bg-white border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
-												>
-													🗑️ Kosongkan wadah
-												</button>
-												<button
-													onClick={handleClose}
-													disabled={alreadyInContainerG <= 0}
-													className="px-3 py-2 rounded-lg bg-neutral-800 text-white text-xs font-medium hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed"
-												>
-													✓ Selesai timbang
-												</button>
-											</div>
-
-											<div className="mt-3 space-y-1">
-												<p className="text-[11px] text-green-700/80">
-													Rentang kerja gravimetri: <span className="font-mono">0,45–0,55 g</span>
-												</p>
-												{alreadyInContainerG > 0 && (alreadyInContainerG < 0.45 || alreadyInContainerG > 0.55) && (
-													<p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-														Massa saat ini{" "}
-														<span className="font-mono font-semibold">
-															{alreadyInContainerG.toFixed(4)} g
-														</span>{" "}
-														di luar rentang standar. Tahap berikutnya akan terkunci sampai massa diperbaiki.
-													</p>
-												)}
-												{nonCanonicalContainer && (
-													<p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-														Penimbangan sampel harus dilakukan pada kaca arloji sebelum masuk ke tahap pelarutan.
-													</p>
-												)}
-											</div>
-										</div>
-									) : canWeigh ? (
-										<div className="mb-4 px-3 py-3 rounded-xl bg-green-50 border border-green-200">
-											<p className="text-sm text-green-800 mb-2">
-												Timbang{" "}
-												<span className="font-semibold">{heldBahan!.name}</span>
-												{" "}({heldBahan!.weightGrams}g tersisa) ke{" "}
-												<span className="font-semibold">{heldContainer!.name}</span>
-											</p>
-											<div className="flex gap-2">
-												<input
-													ref={weighInputRef}
-													type="number"
-													step="0.0001"
-													min="0"
-													max={heldBahan!.weightGrams}
-													value={weighGrams}
-													onChange={(e) => setWeighGrams(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") handleWeigh();
-														e.stopPropagation();
-													}}
-													onKeyUp={(e) => e.stopPropagation()}
-													placeholder="Gram..."
-													className="flex-1 px-3 py-2 rounded-lg border border-green-200 bg-white text-sm text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400"
-												/>
-												<button
-													onClick={handleWeigh}
-													className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 active:bg-green-800 transition-colors"
-												>
-													Timbang
-												</button>
-											</div>
-										</div>
-									) : canRecordMass ? (
-										<div className="mb-4 px-3 py-3 rounded-xl bg-blue-50 border border-blue-200">
-											<p className="text-[11px] text-blue-700/80 uppercase tracking-wide">
-												Neraca Analitik
-											</p>
-											<div className="mt-1 flex items-baseline gap-2">
-												<span className="font-mono text-3xl font-semibold tabular-nums text-blue-800">
-													{cuoBalanceReadingG!.toFixed(4)}
-												</span>
-												<span className="text-sm text-neutral-500">g</span>
-											</div>
-											<p className="mt-0.5 text-[11px] text-blue-700/70">
-												{heldCuoContainer!.name} berisi CuO hasil pijar yang sudah didinginkan
-											</p>
-											<div className="mt-3 flex gap-2">
-												<button
-													onClick={() => {
-														setRecordMassG(cuoBalanceReadingG!.toFixed(4));
-														gameClient.send({
-															type: "record_mass",
-															containerItemId: heldCuoContainer!.itemId,
-															measuredMassG: cuoBalanceReadingG!,
-														});
-													}}
-													className="w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 transition-colors"
-												>
-													Catat bobot CuO
-												</button>
-											</div>
-										</div>
-									) : (
-										<div className="mb-4 px-3 py-3 rounded-xl bg-neutral-50 border border-neutral-200">
-											<p className="text-sm text-neutral-500">
-												{!heldBahan && !heldContainer && "Drag wadah + bahan padat ke tangan untuk menimbang, atau pegang wadah berisi CuO untuk pencatatan bobot"}
-												{!heldBahan && heldContainer && "Drag bahan padat ke tangan untuk ditimbang"}
-												{heldBahan && !heldContainer && "Drag wadah ke tangan (kaca arloji, piala gelas, dll.)"}
-											</p>
-										</div>
-									)}
-								</>
-							)}
-
-							<DroppablePanel
-								id="drop-hand"
-								className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-3 transition-all"
-							>
-								<div className="mb-2 flex items-center justify-between">
-									<p className="text-xs font-semibold text-amber-500">🤲 Tangan</p>
-									<p className="text-[10px] text-amber-400">
-										{holding.length}/2
-										{!isTimbangan && " · Drop item dari objek ke sini"}
+							{/* RIGHT: hand panel */}
+							<HandPanel holding={holding} highlight={isDragging}>
+								{holding.length === 0 ? (
+									<p className="m-auto text-[10px] text-amber-500 italic select-none text-center px-1">
+										Tangan kosong
 									</p>
-								</div>
-								<div className="flex min-h-[104px] gap-2 overflow-x-auto pb-1">
-									{holding.length === 0 && (
-										<p className="flex flex-1 items-center justify-center text-xs text-amber-300">
-											Tangan kosong
-										</p>
-									)}
-									{holding.map((item, index) => (
-										<DraggableObjectCard
-											key={`${item.itemId}-${index}`}
-											id={`hand-${item.itemId}-${index}`}
-											item={item}
-											variant="hand"
-										/>
-									))}
-									{holding.length === 1 && (
-										<div className="flex h-[96px] w-[112px] shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-amber-200">
-											<span className="text-[10px] text-amber-300">slot</span>
-										</div>
-									)}
-								</div>
-							</DroppablePanel>
-							<DragOverlay adjustScale={false} dropAnimation={null} modifiers={[centerDragOverlay]}>
-								{activeDrag ? (
-									<ObjectCardBody
-										item={activeDrag.item}
-										variant={activeDrag.variant}
-										isDragging
-									/>
-								) : null}
-							</DragOverlay>
-						</DndContext>
+								) : (
+									<>
+										{holding.map((item, idx) => (
+											<DraggableObjectCard
+												key={`${item.itemId}-${idx}`}
+												id={`hand-${item.itemId}-${idx}`}
+												item={item}
+												variant="hand"
+											/>
+										))}
+										{holding.length === 1 && (
+											<div className="w-[96px] h-[88px] rounded-xl border-2 border-dashed border-amber-200 flex items-center justify-center text-amber-300 text-xl shrink-0 select-none">
+												+
+											</div>
+										)}
+									</>
+								)}
+							</HandPanel>
+						</div>
+					</DndContext>
+
+					{/* Footer hint */}
+					<div className="px-4 pb-[calc(env(safe-area-inset-bottom,0)+10px)] shrink-0">
+						{isTimbangan ? (
+							<p className="text-[10px] text-neutral-400 text-center leading-snug">
+								Untuk menimbang, pegang wadah + bahan padat di tangan.
+							</p>
+						) : isWaste ? (
+							<p className="text-[10px] text-neutral-400 text-center leading-snug">
+								Hanya wadah dengan isi yang bisa dibuang.
+							</p>
+						) : objectType === "oven" || objectType === "furnace" ? (
+							<p className="text-[10px] text-neutral-400 text-center leading-snug">
+								Drop wadah di {OBJECT_LABELS[objectType].toLowerCase()} untuk memulai proses ({(PROCESS_DURATIONS[objectType] / 1000).toFixed(0)}s).
+							</p>
+						) : handFull ? (
+							<p className="text-[10px] text-amber-600 text-center leading-snug">
+								Tangan penuh — kembalikan dulu salah satu sebelum ambil item baru.
+							</p>
+						) : (
+							<p className="text-[10px] text-neutral-400 text-center leading-snug">
+								Geser item ke samping (tangan) — scroll vertikal aman.
+							</p>
+						)}
 					</div>
 				</div>
 			</div>
 		</>
+	);
+}
+
+// ── Timbangan widget (unchanged behavior, just contained component) ──────
+
+function TimbanganWidget({
+	canWeigh, weighingTerusi, heldBahan, heldContainer, heldCuoContainer,
+	cuoBalanceReadingG, canRecordMass, alreadyInContainerG, nonCanonicalContainer,
+	weighGrams, setWeighGrams, weighInputRef, handleScoop, handleWeigh, handleClose,
+	handleDiscardHeld, setRecordMassG,
+}: {
+	canWeigh: boolean;
+	weighingTerusi: boolean;
+	heldBahan?: HeldItem;
+	heldContainer?: HeldItem;
+	heldCuoContainer?: HeldItem;
+	cuoBalanceReadingG?: number;
+	canRecordMass: boolean;
+	alreadyInContainerG: number;
+	nonCanonicalContainer: boolean;
+	weighGrams: string;
+	setWeighGrams: (v: string) => void;
+	weighInputRef: React.RefObject<HTMLInputElement | null>;
+	handleScoop: () => void;
+	handleWeigh: () => void;
+	handleClose: () => void;
+	handleDiscardHeld: (id: string) => void;
+	setRecordMassG: (v: string) => void;
+}) {
+	return (
+		<div className="flex-1 min-w-0 min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
+			{canWeigh && weighingTerusi ? (
+				<div className="px-3 py-3 rounded-xl bg-green-50 border border-green-200">
+					<p className="text-[11px] text-green-700/80 uppercase tracking-wide">Neraca Analitik</p>
+					<div className="mt-1 flex items-baseline gap-2">
+						<span
+							className={`font-mono text-3xl font-semibold tabular-nums ${
+								alreadyInContainerG >= 0.45 && alreadyInContainerG <= 0.55
+									? "text-emerald-700"
+									: alreadyInContainerG > 0
+										? "text-amber-700"
+										: "text-neutral-400"
+							}`}
+						>
+							{alreadyInContainerG.toFixed(4)}
+						</span>
+						<span className="text-sm text-neutral-500">g</span>
+					</div>
+					<p className="mt-0.5 text-[11px] text-green-700/70">
+						{heldContainer!.name} · sumber: {heldBahan!.name} ({heldBahan!.weightGrams}g tersisa)
+					</p>
+					<div className="mt-3 grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onClick={handleScoop}
+							disabled={(heldBahan!.weightGrams ?? 0) <= 0}
+							className="col-span-2 px-3 py-2.5 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 active:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							🥄 Ambil sedikit sampel
+						</button>
+						<button
+							type="button"
+							onClick={() => handleDiscardHeld(heldContainer!.itemId)}
+							disabled={alreadyInContainerG <= 0}
+							className="px-3 py-2 rounded-lg bg-white border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
+						>
+							🗑️ Kosongkan wadah
+						</button>
+						<button
+							type="button"
+							onClick={handleClose}
+							disabled={alreadyInContainerG <= 0}
+							className="px-3 py-2 rounded-lg bg-neutral-800 text-white text-xs font-medium hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed"
+						>
+							✓ Selesai timbang
+						</button>
+					</div>
+					<div className="mt-3 space-y-1">
+						<p className="text-[11px] text-green-700/80">
+							Rentang kerja gravimetri: <span className="font-mono">0,45–0,55 g</span>
+						</p>
+						{alreadyInContainerG > 0 && (alreadyInContainerG < 0.45 || alreadyInContainerG > 0.55) && (
+							<p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+								Massa saat ini{" "}
+								<span className="font-mono font-semibold">{alreadyInContainerG.toFixed(4)} g</span>{" "}
+								di luar rentang standar. Tahap berikutnya akan terkunci sampai massa diperbaiki.
+							</p>
+						)}
+						{nonCanonicalContainer && (
+							<p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+								Penimbangan sampel harus dilakukan pada kaca arloji sebelum masuk ke tahap pelarutan.
+							</p>
+						)}
+					</div>
+				</div>
+			) : canWeigh ? (
+				<div className="px-3 py-3 rounded-xl bg-green-50 border border-green-200">
+					<p className="text-sm text-green-800 mb-2">
+						Timbang <span className="font-semibold">{heldBahan!.name}</span>{" "}
+						({heldBahan!.weightGrams}g tersisa) ke{" "}
+						<span className="font-semibold">{heldContainer!.name}</span>
+					</p>
+					<div className="flex gap-2">
+						<input
+							ref={weighInputRef}
+							type="number"
+							step="0.0001"
+							min="0"
+							max={heldBahan!.weightGrams}
+							value={weighGrams}
+							onChange={(e) => setWeighGrams(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") handleWeigh();
+								e.stopPropagation();
+							}}
+							onKeyUp={(e) => e.stopPropagation()}
+							placeholder="Gram..."
+							className="flex-1 px-3 py-2 rounded-lg border border-green-200 bg-white text-sm text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400"
+						/>
+						<button
+							type="button"
+							onClick={handleWeigh}
+							className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 active:bg-green-800 transition-colors"
+						>
+							Timbang
+						</button>
+					</div>
+				</div>
+			) : canRecordMass ? (
+				<div className="px-3 py-3 rounded-xl bg-blue-50 border border-blue-200">
+					<p className="text-[11px] text-blue-700/80 uppercase tracking-wide">Neraca Analitik</p>
+					<div className="mt-1 flex items-baseline gap-2">
+						<span className="font-mono text-3xl font-semibold tabular-nums text-blue-800">
+							{cuoBalanceReadingG!.toFixed(4)}
+						</span>
+						<span className="text-sm text-neutral-500">g</span>
+					</div>
+					<p className="mt-0.5 text-[11px] text-blue-700/70">
+						{heldCuoContainer!.name} berisi CuO hasil pijar yang sudah didinginkan
+					</p>
+					<div className="mt-3">
+						<button
+							type="button"
+							onClick={() => {
+								setRecordMassG(cuoBalanceReadingG!.toFixed(4));
+								gameClient.send({
+									type: "record_mass",
+									containerItemId: heldCuoContainer!.itemId,
+									measuredMassG: cuoBalanceReadingG!,
+								});
+							}}
+							className="w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 transition-colors"
+						>
+							Catat bobot CuO
+						</button>
+					</div>
+				</div>
+			) : (
+				<div className="px-3 py-3 rounded-xl bg-neutral-50 border border-neutral-200">
+					<p className="text-sm text-neutral-500">
+						{!heldBahan && !heldContainer && "Bawa wadah + bahan padat ke tangan untuk menimbang, atau pegang wadah berisi CuO untuk pencatatan bobot."}
+						{!heldBahan && heldContainer && "Ambil bahan padat ke tangan untuk ditimbang."}
+						{heldBahan && !heldContainer && "Ambil wadah ke tangan (kaca arloji, piala gelas, dll.)."}
+					</p>
+				</div>
+			)}
+		</div>
 	);
 }

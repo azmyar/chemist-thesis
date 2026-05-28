@@ -10,6 +10,7 @@ declare namespace Cloudflare {
 	interface ProductionEnv {}
 	interface Env {
 		GAME_ROOM?: DurableObjectNamespace<import("./src/index").GameRoom>;
+		DB?: D1Database;
 	}
 }
 interface Env extends Cloudflare.Env {}

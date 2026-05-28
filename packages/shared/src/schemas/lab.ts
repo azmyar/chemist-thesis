@@ -128,6 +128,10 @@ export const levelStateSchema = z.object({
 	startedAt: z.number(),
 	updatedAt: z.number(),
 	lastEvent: z.string().optional(),
+	// Identitas siswa untuk pelacakan progres (penelitian). Nama diisi saat
+	// siswa pertama kali terhubung; sid adalah kunci sesi anonim per perangkat.
+	studentName: z.string().optional(),
+	sid: z.string().optional(),
 });
 export type LevelState = z.infer<typeof levelStateSchema>;
 

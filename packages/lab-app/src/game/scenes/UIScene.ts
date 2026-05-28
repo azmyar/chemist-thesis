@@ -20,12 +20,21 @@ export class UIScene extends Phaser.Scene {
 			("ontouchstart" in window || navigator.maxTouchPoints > 0);
 
 		if (!isTouch) {
-			// Game title
-			this.add
-				.text(16, 16, "ChemistLab", {
+			// Game title — "chemistlab" lowercase, "chemist" bold + "lab" reguler.
+			// "lab" diposisikan tepat di belakang "chemist" via measured width.
+			const chemist = this.add
+				.text(16, 16, "chemist", {
 					fontSize: "16px",
-					color: "#0590d6",
+					color: "#1e1e1e",
 					fontStyle: "bold",
+				})
+				.setScrollFactor(0)
+				.setDepth(100);
+			this.add
+				.text(16 + chemist.width, 16, "lab", {
+					fontSize: "16px",
+					color: "#1e1e1e",
+					fontStyle: "normal",
 				})
 				.setScrollFactor(0)
 				.setDepth(100);
